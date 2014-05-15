@@ -93,7 +93,7 @@ Back on the dashboard you can now see this VM under **Images & Snapshots**. Next
 When finished, the new instance is visible under **Instances**, including the local ip address (only accessible from the work VM with the floating ip). Clicking on its name gives you additional details. Switching to the **Console** tab provides a VNC connection to view the console. Unmodified CANFAR VMs will not boot.
 
 
-### Making CANFAR VMs bootable with OpenStack
+## Making CANFAR VMs bootable with OpenStack
 
 There don't appear to be any standard tools for migrating Xen-based VMs to KVM, with one possible exception:
 https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Virtualization/3.2/html-single/V2V_Guide/index.html
@@ -106,7 +106,7 @@ $ sudo apt-get install libguestfs
 While there are many things that can be done with it, the two main features that have been used are **guestmount** which mounts the image and allows you to make modifications directly without needing to boot the VM in a host, and **guestfish** which is a (scriptable) shell that also provides access to many features of **libguestfs**.
 This web page is a cookbook for *many* useful tasks: http://libguestfs.org/guestfs-recipes.1.html
 
-#### Bleeding-edge build of libguestfs
+### Bleeding-edge build of libguestfs
 
 Note that the version of **libguestfs** provided by Ubuntu 14.04 is 1.24.5, and even though it is < 1 year old, it does not provide all of the tools mentioned in the cookbook. One notable command missing in this version is **virt-customize** which, among other things, allows you to install packages using the native package management system of the image (yum, apt...). Building a bleeding-edge version of **libguestfs** is not hard, but there are other ways to install packages, so this step is not really necessary.
 
@@ -114,9 +114,10 @@ A local build has been made. The code is cloned from a git repository, http://li
 ```
 $ sudo apt-get build-dep libguestfs
 ```
-Next, go read http://rwmj.wordpress.com/tag/supermin/ about how to build supermin first, and include the local copy when you build libguestfs. Don't install the code to the system, you execute the local libguestfs commands using the **run** shell script prefix in the build directory (see the README). A local build has been done on the work VM in ```~/source/libguestfs```.
+Next, go read http://rwmj.wordpress.com/2014/03/08/tip-old-supermin-new-libguestfs-and-v-v/
+about how to build supermin first, and include the local copy when you build libguestfs. Don't install the code to the system, you execute the local libguestfs commands using the **run** shell script prefix in the build directory (see the README). A local build has been done on the work VM in ```~/source/libguestfs```.
 
-#### SYSLINUX boot loader
+### SYSLINUX boot loader
 
 CANFAR images do not seem to be bootable. This cookbook entry solves most of our problems by installing the **SYSLINUX** bootloader:
 
@@ -137,7 +138,7 @@ Next you create a configuration file for the bootloader, syslinux.cfg, with some
    INITRD /initrd.img
    APPEND ro root=LABEL=/
 ```
-The KERNEL and INITRD will be different for each VM depending on the name of the kernel. Note that the root file system is mounted from a labelled the device. The label is set using **e2label**, and for CANFAR VMs this seems to have already been done (**e2label** can be executed inside **guestfish** if needed). This means that we don't need to specify a specific device name which should help with interoperability, since under Xen the virtual devices have names like ```/dev/xvde```, whereas under KVM they have names like ```/dev/vda```.
+The KERNEL and INITRD will be different for each VM depending on the name of the kernel. Note that the root file system is mounted from a labelled the device. The label is set using **e2label**, and for CANFAR VMs this seems to have already been done (**e2label** can be executed inside **guestfish** if needed). This means that we don't need to specify a device name which should help with interoperability, since under Xen the virtual devices have names like ```/dev/xvde```, whereas under KVM they have names like ```/dev/vda```.
 
 Next we fire up **guestfish** to make modifications to the VM, e.g.,
 
@@ -174,5 +175,78 @@ You will probably still need to edit some files. For example, you may need to ch
 
 When you are finished, exit with ```CTRL-D```.
 
+## Variations for specific golden VMs
 
+### ubuntu12.04_amd64
 
+The kernel in these VMs already supports both Xen abd KVM, so no update was required. There are links from ```/vmlinuz``` and ```/initrd.img``` to the particular versions used in ```/boot``` so the ```syslinux.cfg``` requires no further editing. Only ```/etc/fstab``` was modified to to use ```LABEL=/``` for the root partition instead of a device name. 
+
+### sl6_amd64
+
+Similar to the ubuntu12.04_amd64 image, the kernel is new enough that it doesn't require an upgrade. ```/boot/syslinux.cfg``` requires hard-wired particular values of```KERNEL``` and ```INITRD``` as no top-level generic links are provided (and notice that scientific linux use a file called ```initramfs-x.x.x``` instead of ```initrd-x.x.x```).
+
+### sl5_amd64
+
+These older VMs are more complicated, and unfortunately they are probably the most common. When SL5 came out it was still necessary to provide a xen-specific kernel, and it does not appear to work with OpenStack. In order to get one of these images working, it was necessary to install a new kernel, and also make a new ```initrd```.
+
+First, install the **SYSLINUX** bootloader as in the other cases.
+
+Then, a normal (non-xen) kernel is installed. This can be accomplished two ways. The first uses **virt-customize**, but requires a bleeding-edge build of **libguestfs**, e.g.,
+```
+$ virt-customize -a sl5_amd64.img --install kernel
+[   0.0] Examining the guest ...
+[  56.0] Setting a random seed
+[  56.0] Installing packages: kernel
+[ 332.0] Finishing off
+```
+However, since we also need to do some other customizations, it's probably easier just to **guestmount** and **chroot** (can use the older version of **libguestfs**) to do the installation:
+```
+$ sudo -i
+$ guestmount -i -a sl5_amd64.img /mnt/guestos
+$ cd /mnt/guestos
+$ cp /etc/resolv.conf etc/
+$ mount --bind /dev dev
+$ mount --bind /dev/pts dev/pts
+$ mount --bind /proc proc
+$ mount --bind /sys sys
+```
+We are now using the filesystem from the image, and we can execute **yum** commands:
+```
+$ yum install kernel
+$ vi /etc/syslinux.cfg   # Edit to point at the newly-installed kernel and initrd
+```
+After doing this, the VM still wouldn't boot. Referring to this page http://www.ctlai.com/?p=10 it seems that the ```initrd``` that ships with the kernel can't handle the virtual device used to mount the root partition. So, continuing with our **chroot** session above, we generate a new one with what we need (check the actual kernel version numbers):
+```
+$ cd /boot
+$ cp initrd-2.6.18-371.8.1.el5.img initrd-2.6.18-371.8.1.el5.img.backup
+$ mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk initrd-2.6.18-371.8.1.el5.img 2.6.18-371.8.1.el5
+```
+Check ```/etc/fstab```, but it is probably already in good shape as it uses ```LABEL=/``` for the root partition.
+
+The VM should now boot, although it does not start a useful console (visibible to VNC). It is, however, possible to **ssh** in to verify that it is working. This can probably be sorted out by modifying ```/etc/inittab``` and playing with the ```*getty*``` lines -- the ```xvc0``` device seems to be xen-specific.
+
+To exit the **chroot** and **sudo -i** sessions:
+```
+$ exit
+$ exit
+```
+Probably the main problem with this procedure is that we have now installed a kernel that is *definitely not* backwards compatible with the old system since it lacks xen support. Some time was spent looking for a newer kernel that might support both (as in the cases of the newer VMs). One possibility is installing a long-term support kernel from the Community Enterprise Linux Repository (http://elrepo.org) as it is fairly straightforward. Continuing with the **chroot** session from above, do the following:
+```
+$ rpm -Uvh http://www.elrepo.org/elrepo-release-5-5.el5.elrepo.noarch.rpm
+$ vi /etc/yum.repos.d/elrepo.repo   # find [elrepo-kernel] and set enabled=1
+$ yum install kernel-lt
+```
+This operation installs kernel 3.2.58-1.el5.elrepo. As in the case of the older kernel, it does not boot unless you run **mkinitrd** (being sure to use the new kernel version).
+
+After this it seems to boot, although once again there is no console, and it also seems to lack **ssh** access. While watching the kernel boot in the VNC window, one thing that seems to be missing when compared to the earlier kernel (which works) is the following message:
+```
+Ebtables v2.0 registered
+ip6_tables: (C) 2000-2006 Netfilter Core Team
+```
+So this may be the smoking gun of some network thing that isn't bein initialized properly (although **sshd** *does* seem to start).
+
+## Making modified VMs boot on CANFAR
+
+* Presently the VMs modified to boot with OpenStack no longer work with CANFAR!
+
+* Also, we need to figure out what to do about things like ```/staging```.
