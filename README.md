@@ -179,7 +179,7 @@ When you are finished, exit with ```CTRL-D```.
 
 ### ubuntu12.04_amd64
 
-The kernel in these VMs already supports both Xen abd KVM, so no update was required. There are links from ```/vmlinuz``` and ```/initrd.img``` to the particular versions used in ```/boot``` so the ```syslinux.cfg``` requires no further editing. Only ```/etc/fstab``` was modified to to use ```LABEL=/``` for the root partition instead of a device name. 
+The kernel in these VMs already supports both Xen and KVM, so no update was required. There are links from ```/vmlinuz``` and ```/initrd.img``` to the particular versions used in ```/boot``` so the ```syslinux.cfg``` requires no further editing. Only ```/etc/fstab``` was modified to to use ```LABEL=/``` for the root partition instead of a device name. 
 
 ### sl6_amd64
 
@@ -247,6 +247,52 @@ So this may be the smoking gun of some network thing that isn't bein initialized
 
 ## Making modified VMs boot on CANFAR
 
-* Presently the VMs modified to boot with OpenStack no longer work with CANFAR!
+Presently the VMs modified with the **SYSLINUX** bootloader for OpenStack no longer work with CANFAR. Here is some typical output from a failed job (this message about the **Boot loader** is repeated in many places all the way up the call stack):
+```
+Problem with http://iris.cadc.dao.nrc.ca/openstack_testing_sl6_converted.img.gz: Unexpected issue
+STDERR: libvir: Xen error : Domain not found: xenUnifiedDomainLookupByName
+libvir: Xen Daemon error : POST operation failed: xend_post: error from xen daemon: (xend.err "Error creating domain: Boot loader didn't return any data!")
+```
+In this context the **Boot loader** refers to something called **PyGrub** (http://wiki.xen.org/wiki/PyGrub). It seems that Xen, rather than using the actual boot loader of the image (grub or whatever) can optionally query the *configuration* files of various boot loaders (such as grub, LILO, SYSLINUX) with **PyGrub** to determine where the kernel is, and how to boot. **OpenStack**, on the other hand, seems to use the *actual* boot loader itself on the image.
 
-* Also, we need to figure out what to do about things like ```/staging```.
+After some experimentation it was discovered that PyGrub can simply be executed on the command-line with a VM image file to see whether it is retrieving the correct information. On the Cybera work VM, we simply install the Xen tools and try running it on pure CANFAR images, and images converted for OpenStack:
+```
+$ sudo apt-get install xen-tools
+$ cd /mnt/image_store
+$ /usr/lib/xen-4.4/bin/pygrub --debug openstack_testing_12.04.img
+Trying offset  0
+Using <class 'grub.GrubConf.Grub2ConfigFile'> to parse /boot/grub/grub.cfg
+...
+```
+With this CANFAR image it briefly displays a grub selection menu, and it clearly shows that it is parsing the grub2 configuration file. A number of other error messages are then displayed which appear to be related to the fact that we are not in the correct environment for actually launching an instance.
+
+Repeating this test on an image after each step of the modifications required for OpenStack in the previous section pinpoints the operation that breaks PyGrub:
+
+```
+# Within guestfish
+><fs> extlinux /boot
+
+# Then checking with pygrub
+$ /usr/lib/xen-4.4/bin/pygrub --debug openstack_testing_12.04_converted.img 
+Traceback (most recent call last):
+  File "/usr/lib/xen-4.4/bin/pygrub", line 813, in <module>
+    fs = fsimage.open(file, offset, bootfsoptions)
+IOError: [Errno 95] Operation not supported
+Traceback (most recent call last):
+  File "/usr/lib/xen-4.4/bin/pygrub", line 813, in <module>
+    fs = fsimage.open(file, offset, bootfsoptions)
+IOError: [Errno 95] Operation not supported
+Traceback (most recent call last):
+  File "/usr/lib/xen-4.4/bin/pygrub", line 813, in <module>
+    fs = fsimage.open(file, offset, bootfsoptions)
+IOError: [Errno 95] Operation not supported
+Traceback (most recent call last):
+  File "/usr/lib/xen-4.4/bin/pygrub", line 838, in <module>
+    raise RuntimeError, "Unable to find partition containing kernel"
+RuntimeError: Unable to find partition containing kernel
+```
+The particular error reported by pygrub is inside the module ```fsimage``` which appears to be low-level code written in C to extract information from the disk image. Installing the **SYSLINUX** boot loader using **extlinux** has done something that **pygrub** doesn't know how to deal with.
+
+## TODO
+
+* We need to figure out what to do about things like ```/staging```. **Cybera** has created a **flavour** for our CANFAR project called **me1.small** that has ephemeral storage that we can start experimenting with.
