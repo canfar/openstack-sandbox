@@ -293,6 +293,48 @@ RuntimeError: Unable to find partition containing kernel
 ```
 The particular error reported by pygrub is inside the module ```fsimage``` which appears to be low-level code written in C to extract information from the disk image. Installing the **SYSLINUX** boot loader using **extlinux** has done something that **pygrub** doesn't know how to deal with.
 
+### A modified procedure that makes a VM boot with both hypervisors
+
+The following modified procedure makes a VM bootable both on the existing CANFAR system, and with OpenStack. The trick is creating a partition.
+
+The first, additional step is to copy the contents of the original, un-partitioned data in the ```/dev/sda``` block device, to a partition in a new image.
+
+```
+$ guestfish
+><fs> add-ro openstack_testing_12.04.img
+><fs> sparse partition_12.04.img 10G
+><fs> run
+><fs> part-init /dev/sdb mbr
+><fs> part-add /dev/sdb p 2048 -2048
+><fs> copy-device-to-device /dev/sda /dev/sdb1 sparse:true
+><fs> exit
+```
+We now have a new VM called ```partition_12.04.img``` with a size of 10G and the contents of the old image stored in a partition. We probably don't need to exit and re-start **guestfish**, but it is a convenient way to get it to re-mount things as we did in the earlier examples. We then install the **SYSLINUX** boot loader etc.,
+```
+$ sudo guestfish -i -a partition_12.04.img
+
+Operating system: Ubuntu 12.04.4 LTS
+/dev/sda1 mounted on /
+/dev/sdb mounted on /staging
+/dev/sdc mounted on /vmstore
+
+><fs> upload mbr.bin /boot/mbr.bin
+><fs> upload syslinux.cfg /boot/syslinux.cfg
+><fs> copy-file-to-device /boot/mbr.bin /dev/sda size:440
+><fs> extlinux /boot
+><fs> part-set-bootable /dev/sda 1 true
+><fs> vi /etc/fstab          # here just check that LABEL=/ used for / -- should be the case
+><fs> vi /boot/syslinux.cfg  # ensure APPEND ro root=/dev/vda1
+><fs> vi /boot/grub/menu.lst # ensure root=/dev/xvda1 in all kernel lines
+><fs> exit
+```
+This VM will now boot on both systems! Some notes:
+
+- inside ```syslinux.cfg``` it seems to be necessary to specify ```root=/dev/vda1``` for **OpenStack**. When ```root=LABEL=/``` was tried it gave some strange messages, required console interaction to skip problems, and then mounted ```/``` read-only.
+
+- this could cause a problem for **Xen** since the virtual partition name is ```/dev/xvda1```. However, **PyGrub** doesn't care about the actual boot loader, and simply reads the boot loader configuration files. It looks as though it searches for ```/boot/grub/grub.cfg``` *before* ```/boot/syslinux.cfg``` (confirmed by executing **PyGrub** on the command-line with the resulting image), which means that we can put **Xen**-specific boot options in the **grub** configuration files, as we've done here to set ```root=/dev/xvda1``` (it used to be ```/dev/xvda``` before we added the partition). This may allow us to automagically use different kernels for the problematic SL5 images.
+
+
 ## TODO
 
 * We need to figure out what to do about things like ```/staging```. **Cybera** has created a **flavour** for our CANFAR project called **me1.small** that has ephemeral storage that we can start experimenting with.
