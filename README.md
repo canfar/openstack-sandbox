@@ -293,7 +293,7 @@ RuntimeError: Unable to find partition containing kernel
 ```
 The particular error reported by pygrub is inside the module ```fsimage``` which appears to be low-level code written in C to extract information from the disk image. Installing the **SYSLINUX** boot loader using **extlinux** has done something that **pygrub** doesn't know how to deal with.
 
-### A modified procedure that makes a VM boot with both hypervisors
+### A modified procedure that makes a VM boot with both hypervisors (Ubuntu 12.04)
 
 The following modified procedure makes a VM bootable both on the existing CANFAR system, and with OpenStack. The trick is creating a partition.
 
@@ -334,6 +334,64 @@ This VM will now boot on both systems! Some notes:
 
 - this could cause a problem for **Xen** since the virtual partition name is ```/dev/xvda1```. However, **PyGrub** doesn't care about the actual boot loader, and simply reads the boot loader configuration files. It looks as though it searches for ```/boot/grub/grub.cfg``` *before* ```/boot/syslinux.cfg``` (confirmed by executing **PyGrub** on the command-line with the resulting image), which means that we can put **Xen**-specific boot options in the **grub** configuration files, as we've done here to set ```root=/dev/xvda1``` (it used to be ```/dev/xvda``` before we added the partition). This may allow us to automagically use different kernels for the problematic SL5 images.
 
+#### Further modifications for SL5
+
+Exploring the suggestion above, it is indeed possible to make a dual-boot SL5 image, although it requires two kernels. First, create the partitioned version of the initial CANFAR image:
+
+```
+$ guestfish
+><fs> add-ro openstack_testing_sl5.img
+><fs> sparse openstack_testing_sl5_converted.img 10G
+><fs> run
+><fs> part-init /dev/sdb mbr
+><fs> part-add /dev/sdb p 2048 -2048
+><fs> copy-device-to-device /dev/sda /dev/sdb1 sparse:true
+><fs> exit
+```
+
+Next **guestmount** the image, and **chroot**. We can then install the stock (non-xen) kernel, update initrd etc. as in the earlier attempt that resulted in an SL5 image that could only boot with OpenStack:
+
+```
+$ yum install kernel
+$ cd /boot
+$ cp initrd-2.6.18-371.8.1.el5.img initrd-2.6.18-371.8.1.el5.img.backup
+$ cp mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk initrd-2.6.18-371.8.1.el5.img 2.6.18-371.8.1.el5
+```
+
+Finally we exit the **chroot** session and unmount the image, then install **SYSLINUX** and update configuration files:
+
+```
+$ sudo guestfish -i -a openstack_testing_sl5_converted.img
+><fs> upload mbr.bin /boot/mbr.bin
+><fs> upload syslinux.cfg /boot/syslinux.cfg
+><fs> copy-file-to-device /boot/mbr.bin /dev/sda size:440
+><fs> extlinux /boot
+><fs> part-set-bootable /dev/sda 1 true
+><fs> vi /etc/fstab
+><fs> vi /boot/syslinux.cfg
+
+ DEFAULT linux
+ LABEL linux
+   SAY Booting the kernel
+   KERNEL /boot/vmlinuz-2.6.18-371.8.1.el5
+   INITRD /boot/initrd-2.6.18-371.8.1.el5.img
+   APPEND ro root=/dev/vda1
+
+><fs> vi /boot/grub/menu.lst
+
+
+title Scientific Linux (2.6.18-348.16.1.el5xen)
+        root (hd0,0)
+        kernel /boot/vmlinuz-2.6.18-348.16.1.el5xen ro root=LABEL=/ console=xvc0
+        initrd /boot/initrd-2.6.18-348.16.1.el5xen.img
+title Scientific Linux (2.6.18-348.12.1.el5xen)
+        root (hd0,0)
+        kernel /boot/vmlinuz-2.6.18-348.12.1.el5xen ro root=LABEL=/ console=xvc0
+        initrd /boot/initrd-2.6.18-348.12.1.el5xen.img
+
+```
+
+And now it should work on both systems. Note that in this case, in ```/boot/grub/menu.lst``` we *don't* specify ```root=/dev/xvda1``` as in the previous Ubuntu example. For whatever reason that didn't work, and it was happier using ```root=LABEL=/```. No attempt has been made to set ```LABEL=/``` in ```/boot/syslinux.cfg``` as well, but it may work. **PyGrub** will only look at ```/boot/grub/menu.lst```, so it will pick up the original **xen** kernel that is required for CANFAR.
 
 ## TODO
 
