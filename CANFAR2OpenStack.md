@@ -29,76 +29,76 @@ $ sudo apt-get install extlinux
 
 1. **Figure out which OS is installed** on a given CANFAR image, e.g., ```megapipe.img.gz``` (from http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string).
 
-First, save this to ```product-name.sh```:
-```
-#!/bin/sh -
-set -e
-eval "$(guestfish --ro -a "$1" --i --listen)"
-root="$(guestfish --remote inspect-get-roots)"
-guestfish --remote inspect-get-product-name "$root"
-guestfish --remote exit
-```
+    First, save this to ```product-name.sh```:
+    ```
+    #!/bin/sh -
+    set -e
+    eval "$(guestfish --ro -a "$1" --i --listen)"
+    root="$(guestfish --remote inspect-get-roots)"
+    guestfish --remote inspect-get-product-name "$root"
+    guestfish --remote exit
+    ```
 
-Then,
-```
-$ gunzip megapipe.img.gz
-$ sudo ./product_name megapipe.img
-libguestfs: error: mount_ro: mount_ro_stub: /dev/sdb: device not found
-libguestfs: error: mount_ro: mount_ro_stub: /dev/sdc: No such file or directory
-guestfish: some filesystems could not be mounted (ignored)
-Scientific Linux release 5.9 (Boron)
-```
+    Then,
+    ```
+    $ gunzip megapipe.img.gz
+    $ sudo ./product_name megapipe.img
+    libguestfs: error: mount_ro: mount_ro_stub: /dev/sdb: device not found
+    libguestfs: error: mount_ro: mount_ro_stub: /dev/sdc: No such file or directory
+    guestfish: some filesystems could not be mounted (ignored)
+    Scientific Linux release 5.9 (Boron)
+    ```
 
-Ignoring the errors, the final line will tell you whether you are dealing with SL 5.x, SL 6.x, or Ubuntu 12.04 (other results are probably not expected).
+    Ignoring the errors, the final line will tell you whether you are dealing with SL 5.x, SL 6.x, or Ubuntu 12.04 (other     results are probably not expected).
 
-Note that we have used a remote **guestfish** session to make commands easily scriptable. This same trick can be used throughout, although in the following points we simply show the commands that would be entered in an interactive **guestfish** session.
+    Note that we have used a remote **guestfish** session to make commands easily scriptable. This same trick can be used     throughout, although in the following points we simply show the commands that would be entered in an interactive         **guestfish** session.
 
 2. **Install a bootloader**. CANFAR VMs generally *do not* have partitions (e.g., ```/dev/sda1```), just a single block device for the OS (e.g., ```/dev/sda```). While it is not possible to install **grub** easily due to: (a) the lack of a partition; and (b) limitations of **libguestfs** (see http://rwmj.wordpress.com/2013/04/04/new-in-libguestfs-use-syslinux-or-extlinux-to-make-bootable-guests/), one can install another bootloader called **SYSLINUX** (from http://libguestfs.org/guestfs-recipes.1.html#install-syslinux-bootloader-in-a-guest).
 
-Create a file called ```syslinux.cfg``` with something like:
-```
- DEFAULT linux
- LABEL linux
-   SAY Booting the kernel
-   KERNEL /vmlinuz
-   INITRD /initrd.img
-   APPEND ro root=/dev/vda
-```
+    Create a file called ```syslinux.cfg``` with something like:
+    ```
+     DEFAULT linux
+     LABEL linux
+       SAY Booting the kernel
+       KERNEL /vmlinuz
+       INITRD /initrd.img
+       APPEND ro root=/dev/vda
+    ```
 
-The ```KERNEL``` and ```APPEND``` lines need to be modified depending on the OS, but this can be done later.
+    The ```KERNEL```, ```INITRD```, and ```APPEND``` lines need to be modified depending on the OS, but this can be done later.
 
-Next, make a local copy of the master boot record file from the **extlinux** installation:
+    Next, make a local copy of the master boot record file from the **extlinux** installation:
 
-```
-$ cp /usr/lib/extlinux/mbr.bin .
-```
+    ```
+    $ cp /usr/lib/extlinux/mbr.bin .
+    ```
 
-Then we install the bootloader using **guestfish**:
+    Then we install the bootloader using **guestfish**:
 
-```
-$ cp megapipe.img megapipe-kvm.img
-$ sudo guestfish -a megapipe.img -i
-libguestfs: error: mount: mount_stub: /dev/sdb: device not found
-libguestfs: error: mount: mount_stub: /dev/sdc: No such file or directory
-guestfish: some filesystems could not be mounted (ignored)
+    ```
+    $ cp megapipe.img megapipe-kvm.img
+    $ sudo guestfish -a megapipe.img -i
+    libguestfs: error: mount: mount_stub: /dev/sdb: device not found
+    libguestfs: error: mount: mount_stub: /dev/sdc: No such file or directory
+    guestfish: some filesystems could not be mounted (ignored)
 
-Welcome to guestfish, the guest filesystem shell for
-editing virtual machine filesystems and disk images.
+    Welcome to guestfish, the guest filesystem shell for
+    editing virtual machine filesystems and disk images.
 
-Type: 'help' for help on commands
-      'man' to read the manual
-      'quit' to quit the shell
+    Type: 'help' for help on commands
+          'man' to read the manual
+          'quit' to quit the shell
 
-Operating system: Scientific Linux release 5.9 (Boron)
-/dev/sda mounted on /
-/dev/sdb mounted on /staging
-/dev/sdc mounted on /vmstore
+    Operating system: Scientific Linux release 5.9 (Boron)
+    /dev/sda mounted on /
+    /dev/sdb mounted on /staging
+    /dev/sdc mounted on /vmstore
 
-><fs> upload mbr.bin /boot/mbr.bin
-><fs> upload syslinux.cfg  /boot/syslinux.cfg
-><fs> copy-file-to-device /boot/mbr.bin /dev/sda size:440
-><fs> extlinux /boot
-```
+    ><fs> upload mbr.bin /boot/mbr.bin
+    ><fs> upload syslinux.cfg  /boot/syslinux.cfg
+    ><fs> copy-file-to-device /boot/mbr.bin /dev/sda size:440
+    ><fs> extlinux /boot
+    ```
 
 3. **OS-specific modifications**
 
@@ -131,64 +131,64 @@ Operating system: Scientific Linux release 5.9 (Boron)
 
     1. **Scientific Linux 5**
 
-    This is the trickiest type of VM to get working because generic Kernels from this distribution do not support both **Xen** and **KVM** as in the later operating systems; currently a special ```-xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
+        This is the trickiest type of VM to get working because generic Kernels from this distribution do not support both **Xen** and **KVM** as in the later operating systems; currently a special ```-xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
 
-    ```
-    $ sudo -i
-    $ mkdir /mnt/guestos
-    $ guestmount -a megapipe-kvm.img -i /mnt/guestos
-    $ cd /mnt/guestos
-    $ cp /etc/resolv.conf etc/
-    $ mount --bind /dev dev
-    $ mount --bind /dev/pts dev/pts
-    $ mount --bind /proc proc
-    $ mount --bind /sys sys
-    $ chroot /mnt/guestos
-    $ yum install kernel
-    ...
-    Installed:
-      kernel.x86_64 0:2.6.18-371.8.1.el5
+        ```
+        $ sudo -i
+        $ mkdir /mnt/guestos
+        $ guestmount -a megapipe-kvm.img -i /mnt/guestos
+        $ cd /mnt/guestos
+        $ cp /etc/resolv.conf etc/
+        $ mount --bind /dev dev
+        $ mount --bind /dev/pts dev/pts
+        $ mount --bind /proc proc
+        $ mount --bind /sys sys
+        $ chroot /mnt/guestos
+        $ yum install kernel
+        ...
+        Installed:
+          kernel.x86_64 0:2.6.18-371.8.1.el5
 
-    Complete!
-    ```
-    Next, the initial ram disk needs to be updated so that it includes the virtual root partition device (see http://www.ctlai.com/?p=10):
+        Complete!
+        ```
+        Next, the initial ram disk needs to be updated so that it includes the virtual root partition device (see http://www.ctlai.com/?p=10):
 
-    ```
-    $ cd /boot
-    $ cp initrd-2.6.18-371.8.1.el5.img initrd-2.6.18-371.8.1.el5.img.backup
-    $ mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk initrd-2.6.18-371.8.1.el5.img 2.6.18-371.8.1.el5
-    ```
+        ```
+        $ cd /boot
+        $ cp initrd-2.6.18-371.8.1.el5.img initrd-2.6.18-371.8.1.el5.img.backup
+        $ mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk initrd-2.6.18-371.8.1.el5.img 2.6.18-371.8.1.el5
+        ```
 
-    Note that this command is copied verbatim from the example linked above, and probably the ```--builtin=xenblk``` is irrelevant to this kernel since it does not support **Xen**.
+        Note that this command is copied verbatim from the example linked above, and probably the ```--builtin=xenblk``` is irrelevant to this kernel since it does not support **Xen**.
 
-    Exit **chroot** and **guestunmount** the image:
+        Exit **chroot** and **guestunmount** the image:
 
-    ```
-    $ exit             # chroot
-    $ umount dev/pts
-    $ umount dev
-    $ umount proc
-    $ umount sys
-    $ exit             # sudo -i
-    $ sudo guestunmount /mnt/guestos
-    ```
+        ```
+        $ exit             # chroot
+        $ umount dev/pts
+        $ umount dev
+        $ umount proc
+        $ umount sys
+        $ exit             # sudo -i
+        $ sudo guestunmount /mnt/guestos
+        ```
 
-    Edit ```syslinux.cfg``` so that it uses the new kernel, and we have the correct device, ```/dev/vda``` for root:
+        Edit ```syslinux.cfg``` so that it uses the new kernel, and we have the correct device, ```/dev/vda``` for root:
 
-    ```
-    DEFAULT linux
-    LABEL linux
-      SAY Booting the kernel
-      KERNEL /boot/vmlinuz-2.6.18-371.8.1.el5
-      INITRD /boot/initrd-2.6.18-371.8.1.el5.img
-      APPEND ro root=/dev/vda
-    ```
+        ```
+        DEFAULT linux
+        LABEL linux
+          SAY Booting the kernel
+          KERNEL /boot/vmlinuz-2.6.18-371.8.1.el5
+          INITRD /boot/initrd-2.6.18-371.8.1.el5.img
+          APPEND ro root=/dev/vda
+        ```
 
-    The VM should now boot under **KVM**.
+        The VM should now boot under **KVM**.
 
-    However, **no console is presented through a VNC session**. Note that the old **grub** configuration (```/boot/grub/menu.lst```), used by **Xen**, specifies ```consolve=xvc0``` on the kernel command line. This **Xen**-specific virtual device is also listed in ```/etc/inittab```. It is probably possible to get the console to work by changing things to an equivalent **KVM** virtual device called ```ttyS0``` although initial tests have been unsuccessful.
+        However, **no console is presented through a VNC session**. Note that the old **grub** configuration (```/boot/grub/menu.lst```), used by **Xen**, specifies ```consolve=xvc0``` on the kernel command line. This **Xen**-specific virtual device is also listed in ```/etc/inittab```. It is probably possible to get the console to work by changing things to an equivalent **KVM** virtual device called ```ttyS0``` although initial tests have been unsuccessful.
 
-    Regardless of this problem, it is possible to **ssh** in to a running instance.
+        Regardless of this problem, it is possible to **ssh** in to a running instance.
 
     2. **Scientific Linux 6**
 
