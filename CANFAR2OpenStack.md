@@ -25,7 +25,7 @@ It is also necessary to install **extlinux** which is a version of the **SYSLINU
 $ sudo apt-get install extlinux
 ```
 
-## CANFAR VMs bootable with Xen
+## Make CANFAR VMs bootable with Xen
 
 1. **Figure out which OS is installed** on a given CANFAR image, e.g., ```megapipe.img.gz``` (from http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string).
 
@@ -131,7 +131,7 @@ $ sudo apt-get install extlinux
 
     1. **Scientific Linux 5**
 
-        This is the trickiest type of VM to get working because generic Kernels from this distribution do not support both **Xen** and **KVM** as in the later operating systems; currently a special ```-xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
+        This is the trickiest type of VM to get working because generic Kernels from this distribution do not support both **Xen** and **KVM** as in the newer operating systems; currently a special ```-xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
 
         ```
         $ sudo -i
@@ -151,7 +151,7 @@ $ sudo apt-get install extlinux
 
         Complete!
         ```
-        Next, the initial ram disk needs to be updated so that it includes the virtual root partition device (see http://www.ctlai.com/?p=10):
+        Next, the initial ram disk needs to be updated so that it includes the root partition virtual device (see http://www.ctlai.com/?p=10):
 
         ```
         $ cd /boot
@@ -186,10 +186,79 @@ $ sudo apt-get install extlinux
 
         The VM should now boot under **KVM**.
 
-        However, **no console is presented through a VNC session**. Note that the old **grub** configuration (```/boot/grub/menu.lst```), used by **Xen**, specifies ```consolve=xvc0``` on the kernel command line. This **Xen**-specific virtual device is also listed in ```/etc/inittab```. It is probably possible to get the console to work by changing things to an equivalent **KVM** virtual device called ```ttyS0``` although initial tests have been unsuccessful.
+        However, **no console is presented through a VNC session**. Note that the old **grub** configuration (```/boot/grub/menu.lst```), used by **Xen**, specifies ```console=xvc0``` on the kernel command line. This **Xen**-specific virtual device is also listed in ```/etc/inittab```. It is probably possible to get the console to work by changing things to an equivalent **KVM** virtual device called ```ttyS0``` although initial tests have been unsuccessful.
 
         Regardless of this problem, it is possible to **ssh** in to a running instance.
 
     2. **Scientific Linux 6**
 
+        For some reason **guestfish** is not able to automount the partitions for these images (```-i``` option) and exits with an error (this also affects the little script ```product-name.sh``` mentioned earlier for obtaining the OS name). However, it is possible to explicitly mount only the ```/dev/sda``` device like this:
+
+        ```
+        $ sudo guestfish -a test_sl6.img
+
+        Welcome to guestfish, the guest filesystem shell for
+        editing virtual machine filesystems and disk images.
+
+        Type: 'help' for help on commands
+              'man' to read the manual
+              'quit' to quit the shell
+
+        ><fs> run
+        ><fs> mount /dev/sda /
+        ```
+
+        Henceforth **SYSLINUX** can be installed as described above in point #2.
+
+        For these images it is necessary to change the root device from ```/dev/xvde``` to ```LABEL=/``` in ```/etc/fstab```:
+        ```
+        #/dev/xvde              /                       ext3    defaults        1 1
+        LABEL=/                 /                       ext3    defaults        1 1
+        ```
+
+        Then find the newest kernel installed using ```ls /boot``` and edit ```/boot/syslinux.cfg```:
+        ```
+        DEFAULT linux
+        LABEL linux
+          SAY Booting the kernel
+          KERNEL /boot/vmlinuz-2.6.32-431.11.2.el6.x86_64
+          INITRD /boot/initramfs-2.6.32-431.11.2.el6.x86_64.img
+          APPEND ro root=/dev/vda
+        ```
+
+        These modified VMs appear to be fully-functional (including the console).
+
     3. **Ubuntu 12.04**
+
+
+        ```/etc/fstab``` already uses ```LABEL=/``` so no changes should be required.
+
+        We also don't need to make any changes to ```/boot/syslinux.cfg```. Note that Ubuntu places links from ```/vmlinuz``` and ```/initrf.img``` to the currently installed versions in ```/boot```:
+        ```
+        DEFAULT linux
+        LABEL linux
+          SAY Booting the kernel
+          KERNEL /vmlinuz
+          INITRD /initrd.img
+          APPEND ro root=/dev/vda
+        ```
+
+        These modified VMs appear to be fully-functional (including the console).
+
+## Make CANFAR VMs dual-boot Xen/KVM
+
+The VM conversion to KVM as described in the previous section has the advantage that it can be done with existing VMs *in-place*. However, **these VMs are not backwards-compatible with Xen**. Attempting to launch a VMOD session with CANFAR results in an error: ```Boot loader didn't return any data!```. This message results from a failure of **PyGrub** to locate a valid kernel and boot parameters. Experimentation with **PyGrub** on the command-line reveals that the problem is caused by **extlinux** when applied to a block device, e.g., ```/dev/sda``` within **guestfish**, rather than a partition, ```/dev/sda1```. It is possible to make an image dual-boot by creating a copy of the original VM, but with a partitioned file system.
+
+1. **Create a partitioned VM**
+
+    Following http://libguestfs.org/guestfs-recipes.1.html#convert-xen-style-partitionless-image-to-partitioned-disk-image, do the following:
+
+    ```
+    $ sudo guestfish
+    ><fs> add-ro vm.img
+    ><fs> sparse partition_12.04.img 10G
+    ><fs> run
+    ><fs> part-init /dev/sdb mbr
+    ><fs> part-add /dev/sdb p 2048 -2048
+    ><fs> copy-device-to-device /dev/sda /dev/sdb1 sparse:true
+    ```
