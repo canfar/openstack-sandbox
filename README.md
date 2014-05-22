@@ -209,6 +209,7 @@ $ mount --bind /dev dev
 $ mount --bind /dev/pts dev/pts
 $ mount --bind /proc proc
 $ mount --bind /sys sys
+$ chroot /mnt/guestos
 ```
 We are now using the filesystem from the image, and we can execute **yum** commands:
 ```
