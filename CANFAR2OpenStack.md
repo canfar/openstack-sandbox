@@ -27,9 +27,9 @@ $ sudo apt-get install extlinux
 
 ## Make CANFAR VMs bootable with KVM
 
-1. **Figure out which OS is installed** on a given CANFAR image, e.g., ```megapipe.img.gz``` (based on http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string).
+1. **Figure out which OS is installed on a given CANFAR image**
 
-    First, save this to a file called ```os-name.sh```, and make it executable:
+    First, save this to a file called ```os-name.sh```, and make it executable (based on http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string):
     ```
     #!/bin/sh -
     set -e
@@ -53,7 +53,9 @@ $ sudo apt-get install extlinux
 
     Note that we have used a remote **guestfish** session to make commands easily scriptable (commands that you would normally provide to the **guestfish** shell are executed with ```guestfish --remote <cmd>```).
 
-2. **Install a bootloader**. CANFAR VMs generally *do not* have partitions (e.g., ```/dev/sda1```), just a single block device for the OS (e.g., ```/dev/sda```). While it is not possible to install **grub** easily due to: (a) the lack of a partition; and (b) limitations of **libguestfs** (see http://rwmj.wordpress.com/2013/04/04/new-in-libguestfs-use-syslinux-or-extlinux-to-make-bootable-guests/), one can install another bootloader called **SYSLINUX** (from http://libguestfs.org/guestfs-recipes.1.html#install-syslinux-bootloader-in-a-guest).
+2. **Install a bootloader**
+
+    CANFAR VMs generally *do not* have partitions (e.g., ```/dev/sda1```), just a single block device for the OS (e.g., ```/dev/sda```). While it is not possible to install **grub** easily due to: (a) the lack of a partition; and (b) limitations of **libguestfs** (see http://rwmj.wordpress.com/2013/04/04/new-in-libguestfs-use-syslinux-or-extlinux-to-make-bootable-guests/), one can install another bootloader called **SYSLINUX** (from http://libguestfs.org/guestfs-recipes.1.html#install-syslinux-bootloader-in-a-guest).
 
     Create a file called ```syslinux.cfg``` with something like:
     ```
@@ -274,7 +276,9 @@ The VM conversion to KVM as described in the previous section has the advantage 
     ><fs> mount /dev/sdb1 /
     ```
 
-2. **Install a bootloader**. We can install **SYSLINUX** in the same way as the previous section with some minor modifications to account for the partition, and the addition of ```part-set-bootable /dev/sdb 1 true``` which is probably redundant, but follows the example from **libguestfs** recipes:
+2. **Install a bootloader**
+
+    We can install **SYSLINUX** in the same way as the previous section with some minor modifications to account for the partition, and the addition of ```part-set-bootable /dev/sdb 1 true``` which is probably redundant, but follows the example from **libguestfs** recipes:
 
     ```
     ><fs> upload mbr.bin /boot/mbr.bin
