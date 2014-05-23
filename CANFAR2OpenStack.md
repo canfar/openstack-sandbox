@@ -8,7 +8,7 @@ There are two main differences between **Xen** and **KVM** that are relevant to 
 
 1. Virtual device names are different. For example, a partition that might normally be called ```/dev/sda1``` becomes ```/dev/xvda1``` under **Xen**, and ```/dev/vda1``` under **KVM**. This affects things like the kernel options, and mount points in ```/etc/fstab```.
 
-2. In **Xen** the kernel usually resides outside of the guest VM (domU), in the host filesystem (dom0). However, a **Xen** utility called **PyGrub** is used by CANFAR to search for typical bootloader configuration files, e.g., ```/boot/grub/grub.cfg``` to identify which kernel to load within the guest itself at runtime. **KVM** on the other hand requires the installation of a real bootloader on the guest.
+2. In **Xen** the kernel usually resides outside of the guest VM (domU), in the host filesystem (dom0). However, a **Xen** utility called **PyGrub** is used by CANFAR to search for typical bootloader configuration files, e.g., ```/boot/grub/menu.lst``` to identify which kernel to load within the guest itself at runtime. **KVM** on the other hand requires the installation of a real bootloader on the guest.
 
 
 ## Prerequisites
@@ -20,7 +20,7 @@ A software suite called **libguestfs** is used to modify VMs. It provides a numb
 $ sudo apt-get install libguestfs
 ```
 
-It is also necessary to install **extlinux** which is a version of the **SYSLINUX** bootloader for ext partitions:
+It is also necessary to install **extlinux** which is a version of the **SYSLINUX** bootloader for **EXT** partitions:
 ```
 $ sudo apt-get install extlinux
 ```
@@ -49,7 +49,7 @@ $ sudo apt-get install extlinux
     Scientific Linux release 5.9 (Boron)
     ```
 
-    The output will tell you whether you are dealing with SL 5.x, SL 6.x, or Ubuntu 12.04.
+    The output will tell you whether you are dealing with Scientific Linux 5.x, Scientific Linux 6.x, Ubuntu 12.04, or Ubuntu 13.10.
 
     Note that we have used a remote **guestfish** session to make commands easily scriptable (commands that you would normally provide to the **guestfish** shell are executed with ```guestfish --remote <cmd>```).
 
@@ -230,7 +230,6 @@ $ sudo apt-get install extlinux
 
     3. **Ubuntu 12.04**
 
-
         ```/etc/fstab``` already uses ```LABEL=/``` so no changes should be required.
 
         We also don't need to make any changes to ```/boot/syslinux.cfg```. Note that Ubuntu places links from ```/vmlinuz``` and ```/initrf.img``` to the currently installed versions in ```/boot```:
@@ -245,9 +244,14 @@ $ sudo apt-get install extlinux
 
         These modified VMs appear to be fully-functional (including the console).
 
+    4. **Ubuntu 13.10**
+
+        Same procedure as Ubuntu 12.04.
+
+
 ## Make CANFAR VMs dual-boot Xen/KVM
 
-The VM conversion to KVM as described in the previous section has the advantage that it can be done with existing VMs *in-place*. However, **these VMs are not backwards-compatible with Xen**. Attempting to instantiate one of these VMs with CANFAR results in an error: ```Boot loader didn't return any data!```. This message results from **PyGrub**'s failure to locate a valid kernel and boot parameters. Experimentation with **PyGrub** on the command-line reveals that the problem is caused by **extlinux** when applied to a block device instead of a partitiom, e.g., ```/dev/sda``` instead of ```/dev/sda1```. It is possible to make an image dual-boot by creating a copy of the original VM with a partitioned file system.
+The VM conversion to KVM as described in the previous section has the advantage that it can be done with existing VMs *in-place*. However, **these VMs are not backwards-compatible with Xen**. Attempting to instantiate one of these VMs with CANFAR results in an error: ```Boot loader didn't return any data!```. This message results from **PyGrub**'s failure to locate a valid kernel and boot parameters. Experimentation with **PyGrub** on the command-line reveals that the problem is caused by **extlinux** when applied to a block device instead of a partition, e.g., ```/dev/sda``` instead of ```/dev/sda1```. It is possible to make an image dual-boot by creating a copy of the original VM with a partitioned file system.
 
 1. **Create a partitioned VM**
 
@@ -290,7 +294,7 @@ The VM conversion to KVM as described in the previous section has the advantage 
 
         The ability to specify different boot parameters for **Xen** and **KVM** is fortunate because we require different kernels in each case. Once the partitioned version of the VM is made, and a bootloader installed, exit **guestfish** and follow the instructions for a pure **KVM** VM to **guestmount/chroot** and install a generic kernel/initrd that will be used by **KVM**.
 
-        Once the generic kernel is installed, update ```/dev/syslinux.cfg``` to use the new kernel/initrd, and ensure that ```root=/dev/vda1``.
+        Once the generic kernel is installed, update ```/dev/syslinux.cfg``` to use the new kernel/initrd, and ensure that ```root=/dev/vda1```.
 
         You do not need to edit ```/boot/grub/menu.lst``` as it already uses the older ```.el5xen``` kernel, and ```root=LABEL=/``` seems to work (i.e., you do not need to give a specific **Xen** virtual device name as with the other VMs).
 
@@ -310,8 +314,12 @@ The VM conversion to KVM as described in the previous section has the advantage 
 
         You must also edit ```/boot/grub/menu.lst``` and replace occurences of ```root=/dev/xvde``` with ```root=/dev/xvde1```.
 
-    3. **Ubuntu 12.04***
+    3. **Ubuntu 12.04**
 
         Follow the instructions for a pure **KVM** VM, but remember to set ```root=/dev/vda1``` in ```/boot/syslinux.cfg```.
 
         You must also edit ```/boot/grub/menu.lst``` and replace occurences of ```root=/dev/xvda``` with ```root=/dev/xvda1```.
+
+    4. **Ubuntu 13.10**
+
+        Same procedure as Ubuntu 12.04.
