@@ -25,7 +25,7 @@ It is also necessary to install **extlinux** which is a version of the **SYSLINU
 $ sudo apt-get install extlinux
 ```
 
-## Make CANFAR VMs bootable with Xen
+## Make CANFAR VMs bootable with KVM
 
 1. **Figure out which OS is installed** on a given CANFAR image, e.g., ```megapipe.img.gz``` (from http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string).
 
