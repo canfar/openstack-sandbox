@@ -29,7 +29,7 @@ $ sudo apt-get install extlinux
 
 1. **Figure out which OS is installed** on a given CANFAR image, e.g., ```megapipe.img.gz``` (based on http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string).
 
-    First, save this to ```os-name.sh```:
+    First, save this to a file called ```os-name.sh```, and make it executable:
     ```
     #!/bin/sh -
     set -e
@@ -131,7 +131,7 @@ $ sudo apt-get install extlinux
 
     1. **Scientific Linux 5**
 
-        This is the trickiest type of VM to get working because generic kernels from this distribution do not support both **Xen** and **KVM** as in the newer operating systems; currently a special ```-xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
+        This is the trickiest type of VM to get working because generic kernels from this distribution do not support both **Xen** and **KVM** as in the newer operating systems; currently a special ```.el5xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
 
         ```
         $ sudo -i
@@ -159,7 +159,7 @@ $ sudo apt-get install extlinux
         $ mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk initrd-2.6.18-371.8.1.el5.img 2.6.18-371.8.1.el5
         ```
 
-        Note that this command is copied verbatim from the example linked above, and probably the ```--builtin=xenblk``` is irrelevant to this kernel since it does not support **Xen**.
+        Note that this command is copied verbatim from the example linked above, and the ```--builtin=xenblk``` is probably irrelevant to this kernel since it does not support **Xen**.
 
         Exit **chroot** and **guestunmount** the image:
 
@@ -247,7 +247,7 @@ $ sudo apt-get install extlinux
 
 ## Make CANFAR VMs dual-boot Xen/KVM
 
-The VM conversion to KVM as described in the previous section has the advantage that it can be done with existing VMs *in-place*. However, **these VMs are not backwards-compatible with Xen**. Attempting to instantiate one of these VMs with CANFAR results in an error: ```Boot loader didn't return any data!```. This message results from **PyGrub**'s failure to locate a valid kernel and boot parameters. Experimentation with **PyGrub** on the command-line reveals that the problem is caused by **extlinux** when applied to a block device, e.g., ```/dev/sda``` within **guestfish**, rather than a partition, ```/dev/sda1```. It is possible to make an image dual-boot by creating a copy of the original VM, but with a partitioned file system.
+The VM conversion to KVM as described in the previous section has the advantage that it can be done with existing VMs *in-place*. However, **these VMs are not backwards-compatible with Xen**. Attempting to instantiate one of these VMs with CANFAR results in an error: ```Boot loader didn't return any data!```. This message results from **PyGrub**'s failure to locate a valid kernel and boot parameters. Experimentation with **PyGrub** on the command-line reveals that the problem is caused by **extlinux** when applied to a block device instead of a partitiom, e.g., ```/dev/sda``` instead of ```/dev/sda1```. It is possible to make an image dual-boot by creating a copy of the original VM with a partitioned file system.
 
 1. **Create a partitioned VM**
 
@@ -262,7 +262,9 @@ The VM conversion to KVM as described in the previous section has the advantage 
     ><fs> copy-device-to-device /dev/sda /dev/sdb1 sparse:true
     ```
 
-    Within **guestfish** the first (input) image is the ```/dev/sda``` device, and the second "disk" containing the output image, appears in partition ```/dev/sdb1```. At this stage one can exit **guestfish** and re-start, providing ```-a vm_partitioned.img```, and the partition will appear ad ```/dev/sda1```. An alternative, and probably faster method, is to continue with the same session and simply mount ```/dev/sdb1``` as root, and then continue with the installation of the bootloader. This second method is assumed for the remainder of this section.
+    Ensure that the size of ```vm_partitioned.img``` matches the input size (in this case ```10G```).
+
+    Within **guestfish** the first (input) image becomes the ```/dev/sda``` device, and the second "disk" containing the output image, appears in partition ```/dev/sdb1```. At this stage one can exit **guestfish** and re-start, providing ```-a vm_partitioned.img``` on the command-line, and the partition will appear as ```/dev/sda1```. An alternative, and probably faster method, is to continue with the same session and simply mount ```/dev/sdb1``` as root, and then continue with the installation of the bootloader. This second method is assumed for the next section.
 
     ```
     ><fs> mount /dev/sdb1 /
@@ -280,13 +282,27 @@ The VM conversion to KVM as described in the previous section has the advantage 
 
 3. **OS-specific modifications**
 
-We will again modify ```/etc/fstab``` and ```/boot/syslinux.cfg``` for the correct device names and kernel versions. Note that regardless of the fact that our image appears as ```/dev/sdb1``` within **guestfish**, when booted by **KVM** it will appear as the first partition on the first virtual block device, ```/dev/vda1```.
+    We again modify ```/etc/fstab``` and ```/boot/syslinux.cfg``` for the correct device names and kernel versions. Note that regardless of the fact that the image appears as ```/dev/sdb1``` within **guestfish**, when booted by **KVM** it will appear as the first partition on the first virtual block device, ```/dev/vda1```.
 
-Unlike the case of a VM that only targets **KVM**, to maintain backwards compatibility with **Xen** we have to consider the behaviour of **PyGrub** to obtain the location and parameters of the kernel. After reviewing the Python source code, and experimenting, it appears that it searches for configuration files of several bootloaders (GRUB, LILO, SYSLINUX), and stops when one is encountered. Since it searches for GRUB *first*, it will locate ```/boot/grub/menu.lst``` with the kernel parameters for **Xen**, and completely ignore **SYSLINUX**. In other words, it is possible to specify **Xen**-specific boot parameters in ```/boot/grub/menu.lst```, and **KVM**-specific boot parameters in ```/boot/syslinux.cfg```. Usually the only modification to ```/boot/grub/menu.lst``` required after partitioning is to change block device names like ```/dev/xvda``` to the first partition, ```/dev/xvda1```.
+    Unlike the case of a VM that only targets **KVM**, to maintain backwards compatibility with **Xen** we have to consider the behaviour of **PyGrub** to obtain the location and parameters of the kernel. After reviewing the Python source code, and experimenting, it appears that it searches for configuration files of several bootloaders (GRUB, LILO, SYSLINUX), and stops when one is encountered. Since it searches for GRUB *first*, it will locate ```/boot/grub/menu.lst``` with the kernel parameters for **Xen**, and completely ignore **SYSLINUX**. In other words, it is possible to specify **Xen**-specific boot parameters in ```/boot/grub/menu.lst```, and **KVM**-specific boot parameters in ```/boot/syslinux.cfg```. Usually the only modification to ```/boot/grub/menu.lst``` required after partitioning is to change block device names like ```/dev/xvda``` to the first partition, ```/dev/xvda1```.
 
     1. **Scientific Linux 5**
 
-        The ability to specify different boot parameters for **Xen** and **KVM** is fortunate because we require different kernels in each case. Follow the instructions for a pure **KVM** VM, 
+        The ability to specify different boot parameters for **Xen** and **KVM** is fortunate because we require different kernels in each case. Once the partitioned version of the VM is made, and a bootloader installed, exit **guestfish** and follow the instructions for a pure **KVM** VM to **guestmount/chroot** and install a generic kernel/initrd that will be used by **KVM**.
+
+        Once the generic kernel is installed, update ```/dev/syslinux.cfg``` to use the new kernel/initrd, and ensure that ```root=/dev/vda1``.
+
+        You do not need to edit ```/boot/grub/menu.lst``` as it already uses the older ```.el5xen``` kernel, and ```root=LABEL=/``` seems to work (i.e., you do not need to give a specific **Xen** virtual device name as with the other VMs).
+
+        Again, under **KVM**, **there is no console available through VNC**. However, it is possible to **ssh** in.
+
+        **An alternative to this 2-kernel solution may be the installation of a newer kernel** with support for both **Xen** and **KVM**, as with the newer distributions. Some progress to this end was made by adding a new **yum** repo that can provide a more recent long-term release kernel. Instead of installing the generic kernel during the **guestmount/chroot** session, do the following:
+        ```
+        $ rpm -Uvh http://www.elrepo.org/elrepo-release-5-5.el5.elrepo.noarch.rpm
+        $ vi /etc/yum.repos.d/elrepo.repo   # find [elrepo-kernel] and set enabled=1
+        $ yum install kernel-lt
+        ```
+        This installs kernel ```3.2.58-1.el5.elrepo``` and you must again run **mkinitrd** to get the necessary virtual devices for boot (being sure to use the new kernel version). Once ```/boot/syslinux.cfg``` has been updated, the VM appears to boot under **KVM**, although **neither the console, nor ssh access** work. It may simply be a case of experimenting with kernel options to get it going.
 
     2. **Scientific Linux 6**
 
@@ -295,3 +311,7 @@ Unlike the case of a VM that only targets **KVM**, to maintain backwards compati
         You must also edit ```/boot/grub/menu.lst``` and replace occurences of ```root=/dev/xvde``` with ```root=/dev/xvde1```.
 
     3. **Ubuntu 12.04***
+
+        Follow the instructions for a pure **KVM** VM, but remember to set ```root=/dev/vda1``` in ```/boot/syslinux.cfg```.
+
+        You must also edit ```/boot/grub/menu.lst``` and replace occurences of ```root=/dev/xvda``` with ```root=/dev/xvda1```.
