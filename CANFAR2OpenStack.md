@@ -20,7 +20,7 @@ A software suite called **libguestfs** is used to modify VMs. It provides a numb
 $ sudo apt-get install libguestfs
 ```
 
-It is also necessary to install **extlinux** which is a version of the **SYSLINUX** bootloader for **EXT** partitions:
+It is also necessary to install a boot loader. We went with **extlinux** which is a version of the **SYSLINUX** bootloader for **EXT** partitions. GRUB could work too, although required more work for SL5 images. Install it with:
 ```
 $ sudo apt-get install extlinux
 ```
@@ -45,13 +45,13 @@ $ sudo apt-get install extlinux
     Then,
     ```
     $ gunzip megapipe.img.gz
-    $ sudo ./os-name megapipe.img
+    $ sudo ./os-name.sh megapipe.img
     Scientific Linux release 5.9 (Boron)
     ```
 
     The output will tell you whether you are dealing with Scientific Linux 5.x, Scientific Linux 6.x, Ubuntu 12.04, or Ubuntu 13.10.
 
-    Note that we have used a remote **guestfish** session to make commands easily scriptable (commands that you would normally provide to the **guestfish** shell are executed with ```guestfish --remote <cmd>```).
+    Note that we have used a remote **guestfish** session to make commands easily scriptable (commands that you would normally provide to the **guestfish** shell are executed with ```guestfish --remote <cmd>```). As a note, **libguestfs** also has a Python API which we could use to script.
 
 2. **Install a bootloader**
 
@@ -75,7 +75,7 @@ $ sudo apt-get install extlinux
     $ cp /usr/lib/extlinux/mbr.bin .
     ```
 
-    Then we install the bootloader using **guestfish**:
+    Then we install the bootloader using **guestfish**, The mounting errors are not important for now, they are ignored at boot time.
 
     ```
     $ cp megapipe.img megapipe-kvm.img
