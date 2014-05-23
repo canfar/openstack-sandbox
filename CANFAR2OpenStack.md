@@ -13,7 +13,7 @@ There are two main differences between **Xen** and **KVM** that are relevant to 
 
 ## Prerequisites
 
-The test environment for this work is the Cybera Rapid Access Cloud (http://www.cybera.ca/projects/cloud-resources/rapid-access-cloud/). Modifications to CANFAR VMs are made using an Ubuntu 14.04 provisioning VM running on the Cybera RAC (to obtain root access). The modified images ware then uploaded using **glance** from this provisioning VM, and finally executed for testing purposes from the **OpenStack dashboard**. For further details on how it was used, see https://github.com/canfar/openstack-sandbox#cybera-test-environment.
+The test environment for this work is the Cybera Rapid Access Cloud (http://www.cybera.ca/projects/cloud-resources/rapid-access-cloud/). Modifications to CANFAR VMs are made using an Ubuntu 14.04 provisioning VM running on the Cybera RAC (to obtain root access). The modified images are then uploaded using **glance** from this provisioning VM, and finally executed for testing purposes from the **OpenStack dashboard**. For further details on how it was used, see https://github.com/canfar/openstack-sandbox#cybera-test-environment.
 
 A software suite called **libguestfs** is used to modify VMs. It provides a number of tools (especially **guestfish**) that are scriptable. To install on an Ubuntu system:
 ```
@@ -27,31 +27,31 @@ $ sudo apt-get install extlinux
 
 ## Make CANFAR VMs bootable with KVM
 
-1. **Figure out which OS is installed** on a given CANFAR image, e.g., ```megapipe.img.gz``` (from http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string).
+1. **Figure out which OS is installed** on a given CANFAR image, e.g., ```megapipe.img.gz``` (based on http://libguestfs.org/guestfs-recipes.1.html#get-the-operating-system-product-name-string).
 
-    First, save this to ```product-name.sh```:
+    First, save this to ```os-name.sh```:
     ```
     #!/bin/sh -
     set -e
-    eval "$(guestfish --ro -a "$1" --i --listen)"
-    root="$(guestfish --remote inspect-get-roots)"
+    eval "$(guestfish --ro -a "$1" --listen)"
+    guestfish --remote run
+    root="$(guestfish --remote inspect-os)"
     guestfish --remote inspect-get-product-name "$root"
     guestfish --remote exit
     ```
 
+    Note that we have used a remote **guestfish** session to make commands easily scriptable (commands that you would normally provide to the **guestfish** shell are executed with ```guestfish --remote <cmd>```).
+
     Then,
     ```
     $ gunzip megapipe.img.gz
-    $ sudo ./product_name megapipe.img
-    libguestfs: error: mount_ro: mount_ro_stub: /dev/sdb: device not found
-    libguestfs: error: mount_ro: mount_ro_stub: /dev/sdc: No such file or directory
-    guestfish: some filesystems could not be mounted (ignored)
+    $ sudo ./os-name megapipe.img
     Scientific Linux release 5.9 (Boron)
     ```
 
-    Ignoring the errors, the final line will tell you whether you are dealing with SL 5.x, SL 6.x, or Ubuntu 12.04 (other     results are probably not expected).
+    The output will tell you whether you are dealing with SL 5.x, SL 6.x, or Ubuntu 12.04.
 
-    Note that we have used a remote **guestfish** session to make commands easily scriptable. This same trick can be used     throughout, although in the following points we simply show the commands that would be entered in an interactive         **guestfish** session.
+    Note that we have used a remote **guestfish** session to make commands easily scriptable (commands that you would normally provide to the **guestfish** shell are executed with ```guestfish --remote <cmd>```).
 
 2. **Install a bootloader**. CANFAR VMs generally *do not* have partitions (e.g., ```/dev/sda1```), just a single block device for the OS (e.g., ```/dev/sda```). While it is not possible to install **grub** easily due to: (a) the lack of a partition; and (b) limitations of **libguestfs** (see http://rwmj.wordpress.com/2013/04/04/new-in-libguestfs-use-syslinux-or-extlinux-to-make-bootable-guests/), one can install another bootloader called **SYSLINUX** (from http://libguestfs.org/guestfs-recipes.1.html#install-syslinux-bootloader-in-a-guest).
 
@@ -131,7 +131,7 @@ $ sudo apt-get install extlinux
 
     1. **Scientific Linux 5**
 
-        This is the trickiest type of VM to get working because generic Kernels from this distribution do not support both **Xen** and **KVM** as in the newer operating systems; currently a special ```-xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
+        This is the trickiest type of VM to get working because generic kernels from this distribution do not support both **Xen** and **KVM** as in the newer operating systems; currently a special ```-xen``` kernel is installed. First we need to **guestmount** the VM image and use **chroot** to allow us to install the latest generic kernel with **yum**:
 
         ```
         $ sudo -i
@@ -151,7 +151,7 @@ $ sudo apt-get install extlinux
 
         Complete!
         ```
-        Next, the initial ram disk needs to be updated so that it includes the root partition virtual device (see http://www.ctlai.com/?p=10):
+        Next, the initial ram disk needs to be updated so that it includes the ```/dev/vda``` device where the root partition resides (see http://www.ctlai.com/?p=10):
 
         ```
         $ cd /boot
@@ -173,7 +173,7 @@ $ sudo apt-get install extlinux
         $ sudo guestunmount /mnt/guestos
         ```
 
-        Edit ```syslinux.cfg``` so that it uses the new kernel, and we have the correct device, ```/dev/vda``` for root:
+        Edit ```syslinux.cfg``` so that it uses the new kernel and initrd:
 
         ```
         DEFAULT linux
@@ -192,7 +192,7 @@ $ sudo apt-get install extlinux
 
     2. **Scientific Linux 6**
 
-        For some reason **guestfish** is not able to automount the partitions for these images (```-i``` option) and exits with an error (this also affects the little script ```product-name.sh``` mentioned earlier for obtaining the OS name). However, it is possible to explicitly mount only the ```/dev/sda``` device like this:
+        For some reason **guestfish** is not able to automount the partitions for these images (```-i``` option) and exits with an error. However, it is possible to explicitly mount only the ```/dev/sda``` device like this:
 
         ```
         $ sudo guestfish -a test_sl6.img
@@ -247,18 +247,51 @@ $ sudo apt-get install extlinux
 
 ## Make CANFAR VMs dual-boot Xen/KVM
 
-The VM conversion to KVM as described in the previous section has the advantage that it can be done with existing VMs *in-place*. However, **these VMs are not backwards-compatible with Xen**. Attempting to launch a VMOD session with CANFAR results in an error: ```Boot loader didn't return any data!```. This message results from a failure of **PyGrub** to locate a valid kernel and boot parameters. Experimentation with **PyGrub** on the command-line reveals that the problem is caused by **extlinux** when applied to a block device, e.g., ```/dev/sda``` within **guestfish**, rather than a partition, ```/dev/sda1```. It is possible to make an image dual-boot by creating a copy of the original VM, but with a partitioned file system.
+The VM conversion to KVM as described in the previous section has the advantage that it can be done with existing VMs *in-place*. However, **these VMs are not backwards-compatible with Xen**. Attempting to instantiate one of these VMs with CANFAR results in an error: ```Boot loader didn't return any data!```. This message results from **PyGrub**'s failure to locate a valid kernel and boot parameters. Experimentation with **PyGrub** on the command-line reveals that the problem is caused by **extlinux** when applied to a block device, e.g., ```/dev/sda``` within **guestfish**, rather than a partition, ```/dev/sda1```. It is possible to make an image dual-boot by creating a copy of the original VM, but with a partitioned file system.
 
 1. **Create a partitioned VM**
 
     Following http://libguestfs.org/guestfs-recipes.1.html#convert-xen-style-partitionless-image-to-partitioned-disk-image, do the following:
 
     ```
-    $ sudo guestfish
-    ><fs> add-ro vm.img
-    ><fs> sparse partition_12.04.img 10G
+    $ sudo guestfish --ro -a vm.img
+    ><fs> sparse vm_partitioned.img 10G
     ><fs> run
     ><fs> part-init /dev/sdb mbr
     ><fs> part-add /dev/sdb p 2048 -2048
     ><fs> copy-device-to-device /dev/sda /dev/sdb1 sparse:true
     ```
+
+    Within **guestfish** the first (input) image is the ```/dev/sda``` device, and the second "disk" containing the output image, appears in partition ```/dev/sdb1```. At this stage one can exit **guestfish** and re-start, providing ```-a vm_partitioned.img```, and the partition will appear ad ```/dev/sda1```. An alternative, and probably faster method, is to continue with the same session and simply mount ```/dev/sdb1``` as root, and then continue with the installation of the bootloader. This second method is assumed for the remainder of this section.
+
+    ```
+    ><fs> mount /dev/sdb1 /
+    ```
+
+2. **Install a bootloader**. We can install **SYSLINUX** in the same way as the previous section with some minor modifications to account for the partition, and the addition of ```part-set-bootable /dev/sdb 1 true``` which is probably redundant, but follows the example from **libguestfs** recipes:
+
+    ```
+    ><fs> upload mbr.bin /boot/mbr.bin
+    ><fs> upload syslinux.cfg /boot/syslinux.cfg
+    ><fs> copy-file-to-device /boot/mbr.bin /dev/sdb size:440
+    ><fs> extlinux /boot
+    ><fs> part-set-bootable /dev/sdb 1 true
+    ```
+
+3. **OS-specific modifications**
+
+We will again modify ```/etc/fstab``` and ```/boot/syslinux.cfg``` for the correct device names and kernel versions. Note that regardless of the fact that our image appears as ```/dev/sdb1``` within **guestfish**, when booted by **KVM** it will appear as the first partition on the first virtual block device, ```/dev/vda1```.
+
+Unlike the case of a VM that only targets **KVM**, to maintain backwards compatibility with **Xen** we have to consider the behaviour of **PyGrub** to obtain the location and parameters of the kernel. After reviewing the Python source code, and experimenting, it appears that it searches for configuration files of several bootloaders (GRUB, LILO, SYSLINUX), and stops when one is encountered. Since it searches for GRUB *first*, it will locate ```/boot/grub/menu.lst``` with the kernel parameters for **Xen**, and completely ignore **SYSLINUX**. In other words, it is possible to specify **Xen**-specific boot parameters in ```/boot/grub/menu.lst```, and **KVM**-specific boot parameters in ```/boot/syslinux.cfg```. Usually the only modification to ```/boot/grub/menu.lst``` required after partitioning is to change block device names like ```/dev/xvda``` to the first partition, ```/dev/xvda1```.
+
+    1. **Scientific Linux 5**
+
+        The ability to specify different boot parameters for **Xen** and **KVM** is fortunate because we require different kernels in each case. Follow the instructions for a pure **KVM** VM, 
+
+    2. **Scientific Linux 6**
+
+        Follow the instructions for a pure **KVM** VM, but remember to set ```root=/dev/vda1``` in ```/boot/syslinux.cfg```.
+
+        You must also edit ```/boot/grub/menu.lst``` and replace occurences of ```root=/dev/xvde``` with ```root=/dev/xvde1```.
+
+    3. **Ubuntu 12.04***
