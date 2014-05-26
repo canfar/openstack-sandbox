@@ -85,7 +85,7 @@ Next, navigate to the directory with the CANFAR VM, unzip it, and upload it:
 ```
 $ cd /mnt/image_store
 $ gunzip canfar_cybera openstack_testing_sl6.img.gz
-$ image-create --name="canfar_cybera openstack_testing_sl6" --container-format=bare --disk-format=raw < canfar_cybera openstack_testing_sl6.img
+$ glance image-create --name="openstack_testing_sl6" --container-format=bare --disk-format=raw < openstack_testing_sl6.img
 ```
 
 Back on the dashboard you can now see this VM under **Images & Snapshots**. Next to its name you can click on **Launch** to create an instance. The **Instance Name** is your choice. A **Flavor** of at least *m1.small* is probably necessary to accomodate the space requirements of most CANFAR VMs. If these are CANFAR VMs you will already be in possession of the relevant certs, so no extra keypair (under **Access & Security**) need be specified. You then click **launch** and wait a couple of minutes.
