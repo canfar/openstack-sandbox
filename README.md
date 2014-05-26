@@ -28,7 +28,7 @@ $ sudo fdisk -l
 It can then be formatted and mounted like this:
 ```
 $ sudo mkfs -t ext4 /dev/vdc
-$ sudo mkdir /mnt/images
+$ sudo mkdir /mnt/image_store
 $ sudo mount /dev/vdc /mnt/image_store
 ```
 
