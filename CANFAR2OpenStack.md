@@ -20,7 +20,7 @@ A software suite called **libguestfs** is used to modify VMs. It provides a numb
 $ sudo apt-get install libguestfs
 ```
 
-It is also necessary to install a boot loader. We went with **extlinux** which is a version of the **SYSLINUX** bootloader for **EXT** partitions. GRUB could work too, although required more work for SL5 images. Install it with:
+It is also necessary to install a boot loader. We went with **extlinux** which is a version of the **SYSLINUX** bootloader for **EXT** partitions. GRUB could work too, although it requires more work for SL5 images. Install it with:
 ```
 $ sudo apt-get install extlinux
 ```
@@ -186,11 +186,25 @@ $ sudo apt-get install extlinux
           APPEND ro root=/dev/vda
         ```
 
-        The VM should now boot under **KVM**.
+        Finally, in order to obtain a usable console that may be accessed with VNC, modify ```/etc/inittab``` (roughly following suggestions from https://wiki.debian.org/HowToMigrateBackAndForthBetweenXenAndKvm). The following section should be edited as follows:
 
-        However, **no console is presented through a VNC session**. Note that the old **grub** configuration (```/boot/grub/menu.lst```), used by **Xen**, specifies ```console=xvc0``` on the kernel command line. This **Xen**-specific virtual device is also listed in ```/etc/inittab```. It is probably possible to get the console to work by changing things to an equivalent **KVM** virtual device called ```ttyS0``` although initial tests have been unsuccessful.
+        ```
+        # Run gettys in standard runlevels
+        #co:2345:respawn:/sbin/agetty xvc0 9600 vt100-nav #OLD
+        #1:2345:respawn:/sbin/mingetty tty1
+        #2:2345:respawn:/sbin/mingetty tty2
+        #3:2345:respawn:/sbin/mingetty tty3
+        #4:2345:respawn:/sbin/mingetty tty4
+        #5:2345:respawn:/sbin/mingetty tty5
+        #6:2345:respawn:/sbin/mingetty tty6
 
-        Regardless of this problem, it is possible to **ssh** in to a running instance.
+        1:2345:respawn:/sbin/agetty 38400 tty1
+        co:23:respawn:/sbin/agetty -L xvc0 9600 vt100-nav
+        ```
+
+        The ```tty1``` device is used by **KVM**, and we can leave in the ```xvc0``` line for backwards-compatibility with **Xen**.
+
+        The VM should now be fully functional.
 
     2. **Scientific Linux 6**
 
@@ -228,7 +242,7 @@ $ sudo apt-get install extlinux
           APPEND ro root=/dev/vda
         ```
 
-        These modified VMs appear to be fully-functional (including the console).
+        These modified VMs appear to be fully-functional.
 
     3. **Ubuntu 12.04**
 
@@ -244,7 +258,7 @@ $ sudo apt-get install extlinux
           APPEND ro root=/dev/vda
         ```
 
-        These modified VMs appear to be fully-functional (including the console).
+        These modified VMs appear to be fully-functional.
 
     4. **Ubuntu 13.10**
 
@@ -302,9 +316,9 @@ The VM conversion to KVM as described in the previous section has the advantage 
 
         You do not need to edit ```/boot/grub/menu.lst``` as it already uses the older ```.el5xen``` kernel, and ```root=LABEL=/``` seems to work (i.e., you do not need to give a specific **Xen** virtual device name as with the other VMs).
 
-        Again, under **KVM**, **there is no console available through VNC**. However, it is possible to **ssh** in.
+        Remember to modify ```/etc/inittab``` so that it contains both **agetty** line containing ```tty1``` for **KVM**, and ```xvc0``` for **Xen**.
 
-        **An alternative to this 2-kernel solution may be the installation of a newer kernel** with support for both **Xen** and **KVM**, as with the newer distributions. Some progress to this end was made by adding a new **yum** repo that can provide a more recent long-term release kernel. Instead of installing the generic kernel during the **guestmount/chroot** session, do the following:
+        **An alternative to this 2-kernel solution may be the installation of a single newer kernel** with support for both **Xen** and **KVM**, as with the newer distributions. Some progress to this end was made by adding a new **yum** repo that can provide a more recent long-term release kernel. Instead of installing the generic kernel during the **guestmount/chroot** session, do the following:
         ```
         $ rpm -Uvh http://www.elrepo.org/elrepo-release-5-5.el5.elrepo.noarch.rpm
         $ vi /etc/yum.repos.d/elrepo.repo   # find [elrepo-kernel] and set enabled=1
