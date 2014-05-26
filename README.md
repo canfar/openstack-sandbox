@@ -50,7 +50,7 @@ $ scp -i canfar_cybera openstack_testing_sl6.img.gz ubuntu@199.116.235.82:/mnt/i
 
 In order to make the image available, it needs to be uploaded using **glance**. To install some of the basic OpenStack command-line tools on Ubuntu:
 ```
-$ sudo apt-get install pip python-dev libffi-dev libssl-dev
+$ sudo apt-get install python-pip python-dev libffi-dev libssl-dev
 $ sudo pip install python-novaclient
 $ sudo pip install python-glanceclient
 $ sudo pip install python-cinderclient
