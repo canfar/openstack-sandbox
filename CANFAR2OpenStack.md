@@ -20,7 +20,7 @@ A software suite called **libguestfs** is used to modify VMs. It provides a numb
 $ sudo apt-get install libguestfs
 ```
 
-It is also necessary to install a boot loader. We went with **extlinux** which is a version of the **SYSLINUX** bootloader for **EXT** partitions. GRUB could work too, although it requires more work for SL5 images. Install it with:
+It is also necessary to install a boot loader. We went with **extlinux** which is a version of the **SYSLINUX** bootloader for **EXT** partitions. **GRUB** could work too, although it requires more work for SL5 images. Install it with:
 ```
 $ sudo apt-get install extlinux
 ```
