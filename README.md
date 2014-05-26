@@ -256,7 +256,10 @@ libvir: Xen Daemon error : POST operation failed: xend_post: error from xen daem
 ```
 In this context the **Boot loader** refers to something called **PyGrub** (http://wiki.xen.org/wiki/PyGrub). It seems that Xen, rather than using the actual boot loader of the image (grub or whatever) can optionally query the *configuration* files of various boot loaders (such as grub, LILO, SYSLINUX) with **PyGrub** to determine where the kernel is, and how to boot. **OpenStack**, on the other hand, seems to use the *actual* boot loader itself on the image.
 
-After some experimentation it was discovered that PyGrub can simply be executed on the command-line with a VM image file to see whether it is retrieving the correct information. On the Cybera work VM, we simply install the Xen tools and try running it on pure CANFAR images, and images converted for OpenStack:
+After some experimentation it was discovered that PyGrub can simply be executed on the command-line with a VM image file to see whether it is retrieving the correct information. On the Cybera work VM, we simply install the Xen tools and try running it on pure CANFAR images, and images converted for OpenStack.
+
+**WARNING!!!** Executing the following lines will install many dependencies, including a **Xen** kernel (which may render your VM useless if you try to restart it).
+
 ```
 $ sudo apt-get install xen-tools
 $ cd /mnt/image_store
@@ -265,6 +268,7 @@ Trying offset  0
 Using <class 'grub.GrubConf.Grub2ConfigFile'> to parse /boot/grub/grub.cfg
 ...
 ```
+
 With this CANFAR image it briefly displays a grub selection menu, and it clearly shows that it is parsing the grub2 configuration file. A number of other error messages are then displayed which appear to be related to the fact that we are not in the correct environment for actually launching an instance.
 
 Repeating this test on an image after each step of the modifications required for OpenStack in the previous section pinpoints the operation that breaks PyGrub:
@@ -293,6 +297,17 @@ Traceback (most recent call last):
 RuntimeError: Unable to find partition containing kernel
 ```
 The particular error reported by pygrub is inside the module ```fsimage``` which appears to be low-level code written in C to extract information from the disk image. Installing the **SYSLINUX** boot loader using **extlinux** has done something that **pygrub** doesn't know how to deal with.
+
+
+**If you want to remove PyGrub and its various Xen dependencies after you are done** do the following:
+
+```
+$ sudo apt-get purge xen-tools
+$ sudo apt-get autoremove
+```
+
+You will then need to modify ```/boot/grub/grub.cfg``` and ```/boot/grub/menu.lst``` to ensure that there are no more references to **Xen**.
+
 
 ### A modified procedure that makes a VM boot with both hypervisors (Ubuntu 12.04)
 
