@@ -213,5 +213,5 @@ Presently the VM images available to a given OpenStack cloud are stored internal
 
 ## vmod time limits
 
-There is no obvious way to implement a time limit for a vmod using intrinsic features of OpenStack. However, Cloud Scheduler will have the ability to explicitly delete instances once they have timed-out (e.g., ```$ nova delete vmod_instance_name```), so no additional development should be required.
+There is no obvious way to implement a time limit for a vmod using intrinsic features of OpenStack. However, Cloud Scheduler will have the ability to explicitly delete instances once they have timed-out (e.g., automatically issuing ```$ nova delete vmod_instance_name```), so no additional development should be required.
 
