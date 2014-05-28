@@ -8,7 +8,7 @@ Features that are required to implement CANFAR services:
 
 * **Central repository for VMs** that resides outside of specific OpenStack clouds, with a URL that can be provided to access it (proc/vmod)
 
-* **A time limit for the life of an instance** (vmod)
+* **A time limit for the life of an instance** (vmod and proc)
 
 ## Dynamic resource requests
 
@@ -23,7 +23,7 @@ CANFAR submission files can specify **memory**, **CPU cores**, and **temporary s
 
 It appears that any flavor (a hardware template) can be chosen to boot a given VM image, with some caveats:
 
-1. The ```Root Disk``` must be large enough to accomodate the image. If not, when executed through the OpenStack dashboard, it fails with the following message: ```Error: Instance type's disk is too smal for requested image```.
+1. The ```Root Disk``` must be large enough to accomodate the image. If not, when executed through the OpenStack dashboard, it fails with the following message: ```Error: Instance type's disk is too small for requested image```.
 
 2. Additional minimum requirements on the ```Root Disk``` and ```RAM``` can be set *in the image* using, e.g., ```glance image-update [image_name] --min-ram=2000 --min-disk 1```.
 
@@ -54,7 +54,7 @@ $ glance image-show vm_partitioned_sl5_console
 
 In order to boot this VM any values of ```RAM``` and ```Root Disk``` may be chosen, although the latter must be >= 10G to accomodate the image ```size```.
 
-It is also interesting to look at the properties of a **snapshot**. The following details are for a VM instantiated from one of Cybera's base Ubuntu 14.04 images:
+It is also interesting to look at the properties of a **snapshot**. The following details are for a VM instantiated from one of Cybera's base Ubuntu 14.04 images):
 
 ```
 $ glance image-show canfar_work_snapshot
@@ -122,13 +122,13 @@ Deleting and creating flavors can be accomplished with ```nova flavor-create``` 
 
 Since adding flavors is trivial, perhaps they can be generated on-the-fly as needed? Questions:
 
-1. Is it easy to generate flavors on all of the OpenStack clouds that will be serving CANFAR?
+1. Is it easy to generate flavors on all of the OpenStack clouds that will be serving CANFAR? If not, we can require each cloud provider our own CANFAR defined "flavor matrix"
 
-2. What is the actual limit on number of flavors. Would we need to clean up old flavors that we're not using? Based on this bug report, it looks like we can have *at least* 1000: https://bugs.launchpad.net/nova/+bug/1166455
+2. What is the actual limit on number of flavors? Would we need to clean up old flavors that we're not using? Based on this bug report, it looks like we can have *at least* 1000: https://bugs.launchpad.net/nova/+bug/1166455
 
 ### Mounting the /staging partition
 
-CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will probably be something like ```/dev/vdb```.
+CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set as ```/dev/vdb```.
 
 One possible solution is to use filesystem labels to identify ```/staging```, so that the ```/etc/fstab``` entry can be changed to something generic:
 ```
@@ -152,19 +152,18 @@ Next, create an executable script that will do this dynamically with the followi
 # Mount staging... expect /dev/vdb for KVM, /dev/sdb for Xen
 
 # Already Mounted?
-if mount | grep -q /staging; then
+if grep -q /staging /etc/mtab; then
         exit 0
 fi
 
 # Create mount point if needed
-if [ ! -d /staging ]; then
-        mkdir /staging
-fi
+mkdir -p /staging
+
 
 # Choose a device
-if [ -e /dev/vdb ]; then
+if [ -b /dev/vdb ]; then
         DEVICE=/dev/vdb
-elif [ -e /dev/sdb ]; then
+elif [ -b /dev/sdb ]; then
         DEVICE=/dev/sdb
 else
         echo "Couldn't mount /staging! No /dev/vda (KVM) nor /dev/sdb (Xen)"
@@ -203,6 +202,8 @@ mkdir -p /staging/tmp
 chmod ugo+rwxt /staging/tmp
 
 ```
+The above script would only work with SL images. Something similar would have to be done for other images.
+
 
 Note that we may want to skip the ```mkdir``` lines if the call to ```mount_staging``` fails (otherwise they will simply create the ```/staging``` directory on the root filesystem.
 
