@@ -2,17 +2,80 @@
 
 This document explores how to implement CANFAR vmod and proc services using VMs modified to run in the KVM hypervisor (https://github.com/canfar/openstack-sandbox/blob/master/CANFAR2OpenStack.md). The test environment for this work is the Cybera Rapid Access Cloud (https://github.com/canfar/openstack-sandbox#cybera-test-environment).
 
-## Dynamic resource scheduling
+## Dynamic resource requests
 
-CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavours**, which are specific choices for these three parameters. See http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html.
+CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavors**, which are specific choices for these (and other) parameters, required of the execution hardware. See http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html. The relevant parameters in OpenStack parlance are:
 
-It will be necessary to generate a grid of flavours following some naming convention, like ```m1024c1s10``` for 1024 M of memory, 1 core, and 10 G of temporary storage. If we proceed with the same style of submission file, at the time of scheduling it will be necessary to find the closest flavour that *meets or exceeds* the criteria requested by the user.
+| Parameter            | Meaning                                                |
+|----------------------|--------------------------------------------------------|
+| ```RAM```            | RAM to use (MB)                                        |
+| ```VCPUs```          | Number of virtual CPUs                                 |
+| ```Ephemeral Disk``` | Temporary disk space (GB) available for ```/staging``` |
+| ```Root Disk```      | Disk space (GB) for the root (```/```) partition       |
 
-Adding flavours seems to be trivial, and there is no obvious limit to how many can be defined. Perhaps they could be generated on-the-fly?
+It appears that any flavor (a hardware template) can be chosen to boot a given VM image, with some caveats:
 
-## /staging partition
+1. The ```Root Disk``` must be large enough to accomodate the image. If not, when executed through the OpenStack dashboard, it fails with the following message: ```Error: Instance type's disk is too smal for requested image```.
 
-CANFAR VM instances have temporary storage mounted at /staging. This is storage local to the execution node, and therefore fast. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavour. When an instance is executing under **KVM**, the local device will probably be something like ```/dev/vdb```.
+2. Additional minimum requirements on the ```Root Disk``` and ```RAM``` can be set *in the image* using, e.g., ```glance image-update [image_name] --min-ram=2000 --min-disk 1```.
+
+The size of an image, and the values of ```min_disk``` and ```min_ram``` may be queried from the command line with **glance**. For example, the following shows the details of a CANFAR Scientific Linux 5 VM that was modified to dual-boot under KVM and Xen:
+
+```
+$ glance image-show vm_partitioned_sl5_console
++------------------+--------------------------------------+
+| Property         | Value                                |
++------------------+--------------------------------------+
+| checksum         | d5256289d1ce8b0d73cefb768b772911     |
+| container_format | bare                                 |
+| created_at       | 2014-05-26T21:50:25                  |
+| deleted          | False                                |
+| disk_format      | raw                                  |
+| id               | 40ad960b-61e0-4fee-94ee-ee0dd43910f6 |
+| is_public        | False                                |
+| min_disk         | 0                                    |
+| min_ram          | 0                                    |
+| name             | vm_partitioned_sl5_console           |
+| owner            | 3fde3fdfae384a659215d0197953722f     |
+| protected        | False                                |
+| size             | 10737418240                          |
+| status           | active                               |
+| updated_at       | 2014-05-26T21:52:41                  |
++------------------+--------------------------------------+
+```
+
+In order to boot this VM any values of ```RAM``` and ```Root Disk``` may be chosen, although the latter must be >= 10G to accomodate the image.
+
+It will probably be necessary to generate a grid of flavors to accomodate CANFAR users following some naming convention, like ```m1024c1s10``` for 1024 M of memory, 1 core, and 10 G of temporary storage. At job submission time we then identify the closest flavor that *meets or exceeds* the criteria requested by the user.
+
+To list existing flavors:
+
+```
+$ nova flavor-list
++--------------------------------------+-----------+-----------+------+-----------+------+-------+-------------+-----------+
+| ID                                   | Name      | Memory_MB | Disk | Ephemeral | Swap | VCPUs | RXTX_Factor | Is_Public |
++--------------------------------------+-----------+-----------+------+-----------+------+-------+-------------+-----------+
+| 1                                    | m1.tiny   | 512       | 5    | 0         | 512  | 1     | 1.0         | True      |
+| 2                                    | m1.small  | 2048      | 20   | 0         | 2048 | 2     | 1.0         | True      |
+| 3                                    | m1.medium | 4096      | 40   | 0         | 4096 | 2     | 1.0         | True      |
+| 4                                    | m1.large  | 8192      | 80   | 0         | 4096 | 4     | 1.0         | True      |
+| 5                                    | m1.xlarge | 16384     | 160  | 0         | 4096 | 8     | 1.0         | True      |
+| 5d234569-c3e9-4875-a2eb-8137a131b964 | jt.large  | 16384     | 10   | 10        | 2048 | 4     | 1.0         | True      |
+| db9e8d81-fe54-4910-9489-a7867a288d56 | me1.small | 2048      | 20   | 20        | 4096 | 2     | 1.0         | False     |
++--------------------------------------+-----------+-----------+------+-----------+------+-------+-------------+-----------+
+```
+
+Deleting and creating flavors can be accomplished with ```nova flavor-create``` and ```nova flavor-delete```.
+
+Since adding flavors is trivial, perhaps they can be generated on-the-fly as needed? Questions:
+
+1. Is it easy to generate flavors on all of the OpenStack clouds that will be serving CANFAR?
+
+2. What is the actual limit on number of flavors. Would we need to clean up old flavors that we're not using? Based on this bug report, it looks like we can have *at least* 1000: https://bugs.launchpad.net/nova/+bug/1166455
+
+## Mounting the /staging partition
+
+CANFAR VM instances have temporary storage mounted at /staging. This is storage local to the execution node, and therefore fast. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will probably be something like ```/dev/vdb```.
 
 One way to handle this problem is to detect the devices at boot time using an init script. For example, with a Scientific Linux 5 VM, comment-out the line that mounts ```/staging``` in ```/etc/fstab```:
 
@@ -25,7 +88,6 @@ Next, create an executable script that will do this dynamically with the followi
 ```
 #!/bin/bash
 # Mount staging... expect /dev/vdb for KVM, /dev/sdb for Xen
-
 
 # Already Mounted?
 if mount | grep -q /staging; then
