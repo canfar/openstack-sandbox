@@ -1,4 +1,4 @@
-# Running CANFAR (vmod+proc) services with OpenStack
+# CANFAR (vmod+proc) services with OpenStack
 
 This document explores how to implement CANFAR vmod and proc services using VMs modified to run in the KVM hypervisor (https://github.com/canfar/openstack-sandbox/blob/master/CANFAR2OpenStack.md). The test environment for this work is the Cybera Rapid Access Cloud (https://github.com/canfar/openstack-sandbox#cybera-test-environment).
 
@@ -44,7 +44,50 @@ $ glance image-show vm_partitioned_sl5_console
 +------------------+--------------------------------------+
 ```
 
-In order to boot this VM any values of ```RAM``` and ```Root Disk``` may be chosen, although the latter must be >= 10G to accomodate the image.
+In order to boot this VM any values of ```RAM``` and ```Root Disk``` may be chosen, although the latter must be >= 10G to accomodate the image ```size```.
+
+It is also interesting to look at the properties of a **snapshot**. The following details are for a VM instantiated from one of Cybera's base Ubuntu 14.04 images:
+
+```
+$ glance image-show canfar_work_snapshot
++---------------------------------------+--------------------------------------+
+| Property                              | Value                                |
++---------------------------------------+--------------------------------------+
+| Property 'base_image_ref'             | 17b24f7d-acff-4f4e-845e-4d3858d9197e |
+| Property 'image_location'             | snapshot                             |
+| Property 'image_state'                | available                            |
+| Property 'image_type'                 | snapshot                             |
+| Property 'instance_type_ephemeral_gb' | 0                                    |
+| Property 'instance_type_flavorid'     | 2                                    |
+| Property 'instance_type_id'           | 32                                   |
+| Property 'instance_type_memory_mb'    | 2048                                 |
+| Property 'instance_type_name'         | m1.small                             |
+| Property 'instance_type_root_gb'      | 20                                   |
+| Property 'instance_type_rxtx_factor'  | 1                                    |
+| Property 'instance_type_swap'         | 2048                                 |
+| Property 'instance_type_vcpus'        | 2                                    |
+| Property 'instance_uuid'              | fe02831d-b0de-42b7-989d-2fb9f6363732 |
+| Property 'os_type'                    | None                                 |
+| Property 'owner_id'                   | 3fde3fdfae384a659215d0197953722f     |
+| Property 'user_id'                    | 95b8822c449d401fa224710395262e06     |
+| container_format                      | ovf                                  |
+| created_at                            | 2014-05-28T17:27:45                  |
+| deleted                               | False                                |
+| disk_format                           | qcow2                                |
+| id                                    | c530476e-5d87-4a4b-a0e6-10e297c868e0 |
+| is_public                             | False                                |
+| min_disk                              | 20                                   |
+| min_ram                               | 0                                    |
+| name                                  | canfar_work_snapshot                 |
+| owner                                 | 3fde3fdfae384a659215d0197953722f     |
+| protected                             | False                                |
+| size                                  | 0                                    |
+| status                                | queued                               |
+| updated_at                            | 2014-05-28T17:27:45                  |
++---------------------------------------+--------------------------------------+
+```
+
+Note that the ```size``` is 0, but ```min_disk``` is set to 20 (presumably matching the root disk size for the flavor, ```m1.small```).
 
 It will probably be necessary to generate a grid of flavors to accomodate CANFAR users following some naming convention, like ```m1024c1s10``` for 1024 M of memory, 1 core, and 10 G of temporary storage. At job submission time we then identify the closest flavor that *meets or exceeds* the criteria requested by the user.
 
