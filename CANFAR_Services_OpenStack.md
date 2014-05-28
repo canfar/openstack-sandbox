@@ -2,6 +2,14 @@
 
 This document explores how to implement CANFAR vmod and proc services using VMs modified to run in the KVM hypervisor (https://github.com/canfar/openstack-sandbox/blob/master/CANFAR2OpenStack.md). The test environment for this work is the Cybera Rapid Access Cloud (https://github.com/canfar/openstack-sandbox#cybera-test-environment).
 
+Features that are required to implement CANFAR services:
+
+* Dynamic resource requests (users can request specific amounts of **memory**, **numbers of cores**, and **temporary storage space** on execution nodes) (proc)
+
+* Central repository for VMs that resides outside of specific OpenStack clouds, with a URL that can be provided to access it (proc/vmod)
+
+* A time limit for the life of an instance (vmod)
+
 ## Dynamic resource requests
 
 CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavors**, which are specific choices for these (and other) parameters, required of the execution hardware. See http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html. The relevant parameters in OpenStack parlance are:
@@ -89,7 +97,9 @@ $ glance image-show canfar_work_snapshot
 
 Note that the ```size``` is 0, but ```min_disk``` is set to 20 (presumably matching the root disk size for the flavor, ```m1.small```).
 
-It will probably be necessary to generate a grid of flavors to accomodate CANFAR users following some naming convention, like ```m1024c1s10``` for 1024 M of memory, 1 core, and 10 G of temporary storage. At job submission time we then identify the closest flavor that *meets or exceeds* the criteria requested by the user.
+### Flavor handling
+
+It will probably be necessary to generate a grid of flavors to accomodate the full range of CANFAR user requests, following some naming convention, like ```m1024c1s10``` for 1024 M of memory, 1 core, and 10 G of temporary storage. At job submission time we then identify the closest flavor that *meets or exceeds* the criteria requested by the user.
 
 To list existing flavors:
 
@@ -116,11 +126,20 @@ Since adding flavors is trivial, perhaps they can be generated on-the-fly as nee
 
 2. What is the actual limit on number of flavors. Would we need to clean up old flavors that we're not using? Based on this bug report, it looks like we can have *at least* 1000: https://bugs.launchpad.net/nova/+bug/1166455
 
-## Mounting the /staging partition
+### Mounting the /staging partition
 
-CANFAR VM instances have temporary storage mounted at /staging. This is storage local to the execution node, and therefore fast. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will probably be something like ```/dev/vdb```.
+CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will probably be something like ```/dev/vdb```.
 
-One way to handle this problem is to detect the devices at boot time using an init script. For example, with a Scientific Linux 5 VM, comment-out the line that mounts ```/staging``` in ```/etc/fstab```:
+One possible solution is to use filesystem labels to identify ```/staging```, so that the ```/etc/fstab``` entry can be changed to something generic:
+```
+LABEL=/staging               /staging                ext2    defaults        0 0
+```
+
+With OpenStack, it may be possible to configure the ephemeral partition so that it has a labeled partition using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html).
+
+In the existing system, the device mounted as ```/staging``` in a vmod does not appear to have a label. However, there is something about a hard-wired partition name of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file (https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py). It may be possible to modify things so that the staging partition is indeed labeled.
+
+Another brute-force method is to detect the devices at boot time using an init script. For example, with a Scientific Linux 5 VM, comment-out the line that mounts ```/staging``` in ```/etc/fstab```:
 
 ```
 #/dev/sdb               /staging                ext2    defaults        0 0
@@ -186,3 +205,15 @@ chmod ugo+rwxt /staging/tmp
 ```
 
 Note that we may want to skip the ```mkdir``` lines if the call to ```mount_staging``` fails (otherwise they will simply create the ```/staging``` directory on the root filesystem.
+
+## Central VM Repository
+
+Presently the VM images available to a given OpenStack cloud are stored internally, and must be uploaded using **glance**. If this is the only option, then some sort of mirroring from our VOSpace repository to the clouds will be necessary.
+
+## vmod time limits
+
+There is no obvious way to implement a time limit for a vmod using intrinsic features of OpenStack. It will probably be necessary to implement a cron job that checks the ages of instances, and shuts them down explicitly, e.g.,
+
+```
+$ nova delete vmod_instance_name
+```
