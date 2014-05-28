@@ -209,7 +209,8 @@ Note that we may want to skip the ```mkdir``` lines if the call to ```mount_stag
 
 ## Central VM Repository
 
-Presently the VM images available to a given OpenStack cloud are stored internally, and must be uploaded using **glance**. If this is the only option, then some sort of mirroring from our VOSpace repository to the clouds will be necessary.
+Presently the VM images available to a given OpenStack cloud are stored internally, and must be uploaded using **glance**. We will have initially access to only one OpenStack cloud for users. We can limit ourselves to use the VM local repository to this cloud. To manage the same VM across different clouds, there are several options to think about, using Cloud Scheduler. A simple "Summary Usage" page to the user, querying the cloud resource usage API, with a link to each cloud dashboard, could be a good start when multiple OpenStack clouds for VM configuration become available.
+
 
 ## vmod time limits
 
