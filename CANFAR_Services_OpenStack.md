@@ -4,11 +4,11 @@ This document explores how to implement CANFAR vmod and proc services using VMs 
 
 Features that are required to implement CANFAR services:
 
-* Dynamic resource requests (users can request specific amounts of **memory**, **numbers of cores**, and **temporary storage space** on execution nodes) (proc)
+* **Dynamic resource requests** (users can request specific amounts of **memory**, **numbers of cores**, and **temporary storage space** on execution nodes) (proc)
 
-* Central repository for VMs that resides outside of specific OpenStack clouds, with a URL that can be provided to access it (proc/vmod)
+* **Central repository for VMs** that resides outside of specific OpenStack clouds, with a URL that can be provided to access it (proc/vmod)
 
-* A time limit for the life of an instance (vmod)
+* **A time limit for the life of an instance** (vmod)
 
 ## Dynamic resource requests
 
