@@ -8,7 +8,7 @@ Features that are required to implement CANFAR services:
 
 * **Central repository for VMs** that resides outside of specific OpenStack clouds, with a URL that can be provided to access it (proc/vmod)
 
-* **A time limit for the life of an instance** (vmod and proc)
+* **A time limit for the life of an instance** (vmod/proc)
 
 ## Dynamic resource requests
 
@@ -122,7 +122,13 @@ Deleting and creating flavors can be accomplished with ```nova flavor-create``` 
 
 Since adding flavors is trivial, perhaps they can be generated on-the-fly as needed? Questions:
 
-1. Is it easy to generate flavors on all of the OpenStack clouds that will be serving CANFAR? If not, we can require each cloud provider our own CANFAR defined "flavor matrix"
+1. Is it easy to generate flavors on all of the OpenStack clouds that will be serving CANFAR? If not, we can require each cloud provider to incorporate a CANFAR defined "flavor matrix".
+
+    Note that custom flavors can be generate for specific people, using:
+
+    ```$ nova flavor-access-add <flavor-id> <project-id>```
+
+    See http://docs.openstack.org/trunk/openstack-ops/content/private-flavors.html
 
 2. What is the actual limit on number of flavors? Would we need to clean up old flavors that we're not using? Based on this bug report, it looks like we can have *at least* 1000: https://bugs.launchpad.net/nova/+bug/1166455
 
@@ -202,14 +208,14 @@ mkdir -p /staging/tmp
 chmod ugo+rwxt /staging/tmp
 
 ```
-The above script would only work with SL images. Something similar would have to be done for other images.
+The above script only works with Scientific Linux images. Something similar will have to be devised for other images.
 
 
-Note that we may want to skip the ```mkdir``` lines if the call to ```mount_staging``` fails (otherwise they will simply create the ```/staging``` directory on the root filesystem.
+Note that we may want to skip the ```mkdir``` lines if the call to ```mount_staging``` fails (otherwise they will simply create the ```/staging``` directory on the root filesystem).
 
 ## Central VM Repository
 
-Presently the VM images available to a given OpenStack cloud are stored internally, and must be uploaded using **glance**. We will have initially access to only one OpenStack cloud for users. We can limit ourselves to use the VM local repository to this cloud. To manage the same VM across different clouds, there are several options to think about, using Cloud Scheduler. A simple "Summary Usage" page to the user, querying the cloud resource usage API, with a link to each cloud dashboard, could be a good start when multiple OpenStack clouds for VM configuration become available.
+Presently the VM images available to a given OpenStack cloud are stored internally, and must be uploaded using **glance**. Initially we will only have access to a single OpenStack cloud. We can limit ourselves to using the VM repository local to this cloud. To manage the same VM across different clouds, there are several options to think about, using Cloud Scheduler. A simple "Summary Usage" page for the user, querying the cloud resource usage API, with a link to each cloud dashboard, could be a good start when multiple OpenStack clouds for VM configuration become available.
 
 
 ## vmod time limits
