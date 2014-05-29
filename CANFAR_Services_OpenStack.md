@@ -124,11 +124,11 @@ Since adding flavors is trivial, perhaps they can be generated on-the-fly as nee
 
 1. Is it easy to generate flavors on all of the OpenStack clouds that will be serving CANFAR? If not, we can require each cloud provider to incorporate a CANFAR defined "flavor matrix".
 
-    Note that access permissions for specific flavors can be set using **nova** commands, e.g.,
-
+    Note that flavors can be customized to make them accessible only to specific users, e.g.,
+    
     ```$ nova flavor-access-add <flavor-id> <project-id>```
 
-    See http://docs.openstack.org/trunk/openstack-ops/content/private-flavors.html
+    This would allow us to generate flavors that don't interfere with other users of a given OpenStack cloud. See http://docs.openstack.org/admin-guide-cloud/content/customize-flavors.html.
 
 2. What is the actual limit on number of flavors? Would we need to clean up old flavors that we're not using? Based on this bug report, it looks like we can have *at least* 1000: https://bugs.launchpad.net/nova/+bug/1166455
 
