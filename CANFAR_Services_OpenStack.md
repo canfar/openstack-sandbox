@@ -170,14 +170,13 @@ fi
 # Create mount point if needed
 mkdir -p /staging
 
-
 # Choose a device
 if [ -b /dev/vdb ]; then
         DEVICE=/dev/vdb
 elif [ -b /dev/sdb ]; then
         DEVICE=/dev/sdb
 else
-        echo "Couldn't mount /staging! No /dev/vda (KVM) nor /dev/sdb (Xen)"
+        echo "Couldn't mount /staging! No /dev/vdb (KVM) nor /dev/sdb (Xen)"
         exit 1
 fi
 
