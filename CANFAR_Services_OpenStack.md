@@ -8,6 +8,8 @@ Features that are required to implement CANFAR services include:
 
 * **Central repository for VMs** that resides outside of specific OpenStack clouds, with a URL that can be provided to access it (vmod/proc)
 
+* **Central dashboard** to provide a single interface to multiple OpenStack clouds
+
 * **A time limit for the life of an instance** (vmod/proc)
 
 ## Dynamic resource allocation
@@ -144,7 +146,7 @@ One possible solution is to use filesystem labels to identify ```/staging```, so
 LABEL=/staging               /staging                ext2    defaults        0 0
 ```
 
-With OpenStack, it may be possible to configure the ephemeral partition so that it has a labeled partition using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html).
+With OpenStack, it may be possible to configure the ephemeral partition so that it has a labeled partition using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html). See also ```nova boot --ephemeral size=<size>[,format=<format>]```.
 
 In the existing system, the device mounted as ```/staging``` in a vmod does not appear to have a label. However, there is something about a hard-wired partition name of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file (https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py). It may be possible to modify things so that the staging partition is indeed labeled.
 
@@ -220,6 +222,23 @@ Note that we may want to skip the ```mkdir``` lines if the call to ```mount_stag
 
 Presently the VM images available to a given OpenStack cloud are stored internally, and must be uploaded using **glance**. Initially we will only have access to a single OpenStack cloud. We can limit ourselves to using the VM repository local to this cloud. To manage the same VM across different clouds, there are several options to think about, using Cloud Scheduler. A simple "Summary Usage" page for the user, querying the cloud resource usage API, with a link to each cloud dashboard, could be a good start when multiple OpenStack clouds for VM configuration become available.
 
+## Central Dashboard
+
+CANFAR currently has a single, custom dashboard that handles jobs on all of the available clouds. The standard dashboard for OpenStack is **Horizon**, and it is likely that each OpenStack cloud used by CANFAR will have its own instance of Horizon running.
+
+It may be desirable to run a local instance of Horizon with CANFAR branding. According to this web page, http://docs.openstack.org/developer/horizon/topics/deployment.html, one modifies ```local_settings.py```, primarily to set
+```
+OPENSTACK_HOST = "keystone-yyc.cloud.cybera.ca"
+```
+which in this example enables us to interface the Cybera cloud.
+
+For further information on dashboard installation and configuration see: http://docs.openstack.org/grizzly/openstack-compute/install/apt/content/installing-openstack-dashboard.html
+
+Judging from the Horizon source code (https://github.com/openstack/horizon), it's clear that Horizon is using the Python SDK (look in ```openstack_dashboard/api/```), similar to the Python CLI (e.g., **glance**, **nova**, **keystone**), which wraps underling REST calls. See http://docs.openstack.org/api/quick-start/content/ for further details.
+
+According to this web page, http://www.metacloud.com/2014/03/17/openstack-horizon-controlling-cloud-using-django/, Horizon consists of a modular base library, and a reference dashboard that combines them in to a useable application. If at some point in the future we wish to build a "meta dashboard" to handle multiple clouds, it's conceivable that we might build such an application from existing components in the Horizon core libraries. If and when this is needed, we might also tackle the problem of the central VM repository mentioned in the previous section as part of this work.
+
+In the short term it will probably suffice to install and customize a local CANFAR horizon dashboard from package repositories.
 
 ## vmod time limits
 
