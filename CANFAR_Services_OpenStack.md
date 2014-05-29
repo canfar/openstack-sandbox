@@ -240,6 +240,18 @@ According to this web page, http://www.metacloud.com/2014/03/17/openstack-horizo
 
 In the short term it will probably suffice to install and customize a local CANFAR horizon dashboard from package repositories.
 
+### Horizon and regions
+
+Note that Horizon already understands an OpenStack concept called **regions**. As an example, on the Cybera RAC, the user is presented with a choice of region at login time (https://cloud.cybera.ca/). This is the coarsest segregation scheme available with OpenStack (see http://docs.openstack.org/trunk/openstack-ops/content/scaling.html). Another good blog post is here: http://kimizhang.wordpress.com/2013/08/26/openstack-zoning-regionavailability-zonehost-aggregate/. Regions have separate **nova** installations, and separate API endpoints (i.e., with something like **glance** you would have to specify which region you are talking about). The only shared service is **keystone**.
+
+Question:
+
+Might it be possible to support multiple OpenStack clouds under the CANFAR umbrella using regions? These documents look interesting:
+
+* DAIR OpenStack Modifications: https://docs.google.com/document/d/1Dxxhgc2USQrxCAfYzD8Nk3RS9ZZpocavIHie0FfN7Ls/edit
+
+* Support multiple endpoints for the same service in Horizon: https://blueprints.launchpad.net/horizon/+spec/multiple-service-endpoints
+
 ## vmod time limits
 
 There is no obvious way to implement a time limit for a vmod using intrinsic features of OpenStack. However, Cloud Scheduler will have the ability to explicitly delete instances once they have timed-out (e.g., automatically issuing ```$ nova delete vmod_instance_name```), so no additional development should be required.
