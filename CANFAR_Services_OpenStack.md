@@ -136,7 +136,7 @@ Since adding flavors is trivial, perhaps they can be generated on-the-fly as nee
 
 ### Mounting the /staging partition
 
-CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set as ```/dev/vdb```.
+CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set to ```/dev/vdb```.
 
 
 #### filesystem labels
@@ -146,52 +146,86 @@ One possible solution is to use filesystem labels to identify ```/staging```, so
 LABEL=/staging               /staging                ext2    defaults        0 0
 ```
 
-With OpenStack, it may be possible to configure the ephemeral partition so that it has a labeled partition using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html). See also ```nova boot --ephemeral size=<size>[,format=<format>]```.
+With OpenStack, it may be possible to configure the ephemeral partition so that it has a label using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html). The default label is ```ephemeral0```. See also ```nova boot --ephemeral size=<size>[,format=<format>]```. After consulting with people at Cybera, this is a general configuration option that would affect all users, and could not be associated only with CANFAR users. It is therefore **not a good solution**.
 
-In the existing system, the device mounted as ```/staging``` in a vmod does not appear to have a label. However, there is something about a hard-wired partition name of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file (https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py). It may be possible to modify things so that the staging partition is indeed labeled.
+In the existing system, the device mounted as ```/staging``` in a vmod does not appear to have a label. However, there is something about a hard-wired partition name of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file (https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py). It may be possible to modify things so that the staging partition is indeed labeled. If it isn't possible to change the label used by OpenStack, maybe the Nimbus label could be changed to match what OpenStack uses.
 
 #### init script
 
-Another brute-force method is to detect the devices at boot time using an init script. For example, with a Scientific Linux 5 VM, comment-out the line that mounts ```/staging``` in ```/etc/fstab```:
+Another brute-force method is to detect the devices at boot time using an init script.
+
+First, comment-out the line that mounts ```/staging``` in ```/etc/fstab```:
 
 ```
 #/dev/sdb               /staging                ext2    defaults        0 0
 ```
 
-Next, create an executable script that will do this dynamically with the following contents in ```/etc/init.d/mount_staging```:
+Next, create an executable script that will mount the device dynamically, with the following contents, in ```/etc/init.d/mount_staging```:
 
 ```
 #!/bin/bash
-# Mount staging... expect /dev/vdb for KVM, /dev/sdb for Xen
+#
+# Mount /staging
+#
+# - Under OpenStack/KVM we expect nova to add the label "ephemeral0"
+#   on /dev/vdb
+#
+# - Under Nimbus/Xen we expect the label "blankpartition0"
+#   on /dev/sdb or /dev/xvdb depending on the distro
+#
 
 # Already Mounted?
 if grep -q /staging /etc/mtab; then
-        exit 0
+    exit 0
 fi
 
 # Create mount point if needed
 mkdir -p /staging
 
 # Choose a device
-if [ -b /dev/vdb ]; then
-        DEVICE=/dev/vdb
+if [ -b /dev/disk/by-label/ephemeral0 ]; then
+    # The nova default for OpenStack
+    DEVICE=/dev/disk/by-label/ephemeral0
+
+elif [ -b /dev/disk/by-label/blankpartition0 ]; then
+    # The label expected for Nimbus/Xen
+    DEVICE=/dev/disk/by-label/blankpartition0
+
+elif [ -b /dev/vdb ]; then
+    # If no label, this might be the device under KVM
+    DEVICE=/dev/vdb
+
 elif [ -b /dev/sdb ]; then
-        DEVICE=/dev/sdb
+    # If no label, this might be the device under Xen (SL 5)
+    DEVICE=/dev/sdb
+
+elif [ -b /dev/xvdb ]; then
+    # If no label, this might be the device under Xen (Ubuntu 12.04)
+    DEVICE=/dev/xvdb
+
 else
-        echo "Couldn't mount /staging! No /dev/vdb (KVM) nor /dev/sdb (Xen)"
-        exit 1
+    echo "Couldn't mount /staging! No valid device could be found."
+    exit 1
 fi
 
 # Try mounting
 mount -o defaults ${DEVICE} /staging
 
 if [ "$?" -ne "0" ]; then
-        echo "Failed to mount ${DEVICE} at /staging."
+    echo "Failed to mount ${DEVICE} at /staging."
+    exit 1
 fi
 
 ```
 
-Finally, edit ```/etc/rc.d/rc.local``` to call the mount script before creating directories within ```/staging```:
+With **guestfish**, if the script already exists locally, you can add it to an image like this
+
+```
+><fs> upload mount_staging /etc/init.d/mount_staging
+><fs> chmod 0755 /etc/init.d/mount_staging
+```
+
+For **Scientific Linux VMs**, edit ```/etc/rc.d/rc.local``` to call the mount script before creating directories within ```/staging```:
 
 ```
 #!/bin/sh
@@ -214,19 +248,80 @@ mkdir -p /staging/tmp
 chmod ugo+rwxt /staging/tmp
 
 ```
-The above script only works with Scientific Linux images. Something similar will have to be devised for other images.
 
-Note that we may want to skip the ```mkdir``` lines if the call to ```mount_staging``` fails (otherwise they will simply create the ```/staging``` directory on the root filesystem).
+Similarly, for **Ubuntu VMs**, edit ```/etc/rc.local```:
 
-## Central VM Repository
+```
+#!/bin/sh -e
+#
+# rc.local
+#
+# This script is executed at the end of each multiuser runlevel.
+# Make sure that the script will "exit 0" on success or any other
+# value on error.
+#
+# In order to enable or disable this script just change the execution
+# bits.
+#
+# By default this script does nothing.
 
-Presently the VM images available to a given OpenStack cloud are stored internally, and must be uploaded using **glance**. Initially we will only have access to a single OpenStack cloud. We can limit ourselves to using the VM repository local to this cloud. To manage the same VM across different clouds, there are several options to think about, using Cloud Scheduler. A simple "Summary Usage" page for the user, querying the cloud resource usage API, with a link to each cloud dashboard, could be a good start when multiple OpenStack clouds for VM configuration become available.
+# Mount /staging
+/etc/init.d/mount_staging
+
+# Create condor EXECUTE dir
+mkdir -p /staging/condor
+chown condor:condor /staging/condor
+
+# Added for CANFAR VM
+mkdir -p /staging/tmp
+chmod ugo+rwxt /staging/tmp
+
+exit 0
+```
+
+Note that we may want to check for bad exit status from ```mount_staging```, otherwise the following ```mkdir``` calls will create the ```/staging``` directory on the root filesystem.
+
+## VM Repository
+
+In the existing CANFAR system, all images reside in VOSpace. A snapshot of running VMs can be stored to a user's VOSpace using **vmsave**. This feature is primarily used to store images that will subsequently be used for batch processing (proc), following an interactive vmod session to install software. The job submission file used by proc then provides a URL to the stored image location.
+
+OpenStack stores images internally, and they are managed using **glance** (upload/download images, list available images, etc.). Snapshots of running VMs can be made in two ways:
+
+1. **From outside of the running VM** using ```nova image-create```. Even though this is executed externally, the resulting image is stored within the cloud, and would need to be fetched using **glance** if a "local" copy in VOSpace were desired.
+
+    Note: The image creation happens asynchronously... we need to figure out how to query whether it's finished or not. One silly way is to check the ```staus``` column for the given image name in the output from ```glance image-list```. There will certainly be something in the REST API for this.
+
+    See this web page for additional issues regarding the state of memory, disk flushes etc.: http://docs.openstack.org/trunk/openstack-ops/content/snapshots.html.
+
+2. **From a Horizon Dashboard instance**. This is equivalent to executing **nova** commands, and again, **glance** would be needed to copy an image into VOSpace once it is completed.
+
+When it comes to batch processing, if we intend to continue providing a URL to the image in VOSpace in the submission files, it will be up to the scheduler to ensure that the cloud that ultimately executes the job has a copy of the desired VM.
+
+**Initially we will only have access to a single OpenStack cloud**. To make life easier, we might simply let OpenStack manage our VMs for us in the early stages. The only modification needed would be to provide an **image name** in the job submission file, rather than a full URL.
+
+**When we scale to multiple clouds** there are two obvious models that we might pursue:
+
+1. Use a **central** repository (i.e., VOSpace) to store the images:
+
+    * We will need a mechanism to ensure that snapshots of running configuration instances are copied back into VOSpace so that they can later be used for batch processing. A simple solution may be a script that initiates ```nova image-create```, waits until it is done, and then uses **glance** to copy it back to VOSpace. Alternatively, if we create our own CANFAR-themed dashboard, we might add this functionality there.
+
+    * For batch processing the scheduler will have to ensure that the correct version of the VM image exists on the target cloud. The checksum of images stored internally to an OpenStack cloud can be queried, so we can avoid unnecessarily uploading images.
+
+2. A **distributed** model in which we attempt to synchronize the images stored among the various clouds as needed:
+
+    * We wouldn't necessarily need to download a snapshot image from a cloud once a configuration session is finished.
+
+    * Whenever we start a new job (either proc, or vmod), we provide a name for the image that we want to instantiate. We would have to query all of the clouds to see which one has the newest version (with that name), and transfer a copy of it to a different target cloud if needed. If the job is executed on the same cloud where this newest version exists, no transfer is needed.
+
+    * This is sort of like VOSpace, so we would need to ensure full sets of the data on redundant subsets of the clouds to account for downtime.
 
 ## Central Dashboard
 
 CANFAR currently has a single, custom dashboard that handles jobs on all of the available clouds. The standard dashboard for OpenStack is **Horizon**, and it is likely that each OpenStack cloud used by CANFAR will have its own instance of Horizon running.
 
-It may be desirable to run a local instance of Horizon with CANFAR branding. According to this web page, http://docs.openstack.org/developer/horizon/topics/deployment.html, one modifies ```local_settings.py```, primarily to set
+A simple way to manage multiple clouds is to provide a CANFAR-themed "Summary Usage" page for the user, querying the cloud resource usage API, with a link to each cloud dashboard.
+
+However, it may be desirable to run a local instance of Horizon with CANFAR branding. According to this web page, http://docs.openstack.org/developer/horizon/topics/deployment.html, one modifies ```local_settings.py```, primarily to set
 ```
 OPENSTACK_HOST = "keystone-yyc.cloud.cybera.ca"
 ```
