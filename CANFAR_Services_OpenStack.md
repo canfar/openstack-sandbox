@@ -289,7 +289,7 @@ OpenStack stores images internally, and they are managed using **glance** (uploa
 
 1. **From outside of the running VM** using ```nova image-create```. Even though this is executed externally, the resulting image is stored within the cloud, and would need to be fetched using **glance** if a "local" copy in VOSpace were desired.
 
-    Note: The image creation happens asynchronously... we need to figure out how to query whether it's finished or not. One silly way is to check the ```staus``` column for the given image name in the output from ```glance image-list```. There will certainly be something in the REST API for this.
+    Note: The image creation happens asynchronously... we need to figure out how to query whether it's finished or not. One silly way is to check the ```status``` column for the given image name in the output from ```glance image-list```. There will certainly be something in the REST API for this.
 
     See this web page for additional issues regarding the state of memory, disk flushes etc.: http://docs.openstack.org/trunk/openstack-ops/content/snapshots.html.
 
@@ -302,17 +302,12 @@ When it comes to batch processing, if we intend to continue providing a URL to t
 **When we scale to multiple clouds** there are two obvious models that we might pursue:
 
 1. Use a **central** repository (i.e., VOSpace) to store the images:
-
     * We will need a mechanism to ensure that snapshots of running configuration instances are copied back into VOSpace so that they can later be used for batch processing. A simple solution may be a script that initiates ```nova image-create```, waits until it is done, and then uses **glance** to copy it back to VOSpace. Alternatively, if we create our own CANFAR-themed dashboard, we might add this functionality there.
-
     * For batch processing the scheduler will have to ensure that the correct version of the VM image exists on the target cloud. The checksum of images stored internally to an OpenStack cloud can be queried, so we can avoid unnecessarily uploading images.
-
+    
 2. A **distributed** model in which we attempt to synchronize the images stored among the various clouds as needed:
-
     * We wouldn't necessarily need to download a snapshot image from a cloud once a configuration session is finished.
-
     * Whenever we start a new job (either proc, or vmod), we provide a name for the image that we want to instantiate. We would have to query all of the clouds to see which one has the newest version (with that name), and transfer a copy of it to a different target cloud if needed. If the job is executed on the same cloud where this newest version exists, no transfer is needed.
-
     * This is sort of like VOSpace, so we would need to ensure full sets of the data on redundant subsets of the clouds to account for downtime.
 
 ## Central Dashboard
