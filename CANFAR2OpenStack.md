@@ -300,9 +300,11 @@ The VM conversion to KVM as described in the previous section has the advantage 
     ><fs> copy-file-to-device /boot/mbr.bin /dev/sdb size:440
     ><fs> extlinux /boot
     ><fs> part-set-bootable /dev/sdb 1 true
-```
+    ```
 
-3. The ```/staging``` partition is provided by different devices under Xen/KVM. The following link gives two potential methods for tackling this problem: https://github.com/canfar/openstack-sandbox/blob/master/CANFAR_Services_OpenStack.md#mounting-the-staging-partition
+3. **Mount /staging**
+
+    The ```/staging``` partition is provided by different devices under **Xen/KVM**. The following link gives two potential methods for tackling this problem: https://github.com/canfar/openstack-sandbox/blob/master/CANFAR_Services_OpenStack.md#mounting-the-staging-partition
 
 4. **OS-specific modifications**
 
