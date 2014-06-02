@@ -120,21 +120,23 @@ $ nova flavor-list
 
 Deleting and creating flavors can be accomplished with ```nova flavor-create``` and ```nova flavor-delete```.
 
-Since adding flavors is trivial, perhaps they can be generated on-the-fly as needed? Questions:
+In current OpenStack clouds, users can not generate flavors up, which give them less fine grain of the VM they use. However, it reasonable to think most users do not care about the fine graining, and giving them a small amount of flavors (less than 20) should be perfectly manageable and would most likely fit all user requirements. Adding flavors for an OpenStack admin is trivial and will not happen very often, so we can keep it manually at first.
 
-1. Is it easy to generate flavors on all of the OpenStack clouds that will be serving CANFAR? If not, we can require each cloud provider to incorporate a CANFAR defined "flavor matrix".
+Question: is managing cross-clouds flavors necessary? 
 
-    Note that flavors can be customized to make them accessible only to specific users, e.g.,
-    
-    ```$ nova flavor-access-add <flavor-id> <project-id>```
+Note that flavors can be customized to make them accessible only to specific users, e.g.
+```$ nova flavor-access-add <flavor-id> <project-id>```
 
-    This would allow us to generate flavors that don't interfere with other users of a given OpenStack cloud. See http://docs.openstack.org/admin-guide-cloud/content/customize-flavors.html.
+This would allow us to generate flavors that don't interfere with other users of a given OpenStack cloud. See http://docs.openstack.org/admin-guide-cloud/content/customize-flavors.html. 
 
-2. What is the actual limit on number of flavors? Would we need to clean up old flavors that we're not using? Based on this bug report, it looks like we can have *at least* 1000: https://bugs.launchpad.net/nova/+bug/1166455
+### Ephemeral storage and the /staging partition
 
-### Mounting the /staging partition
+As we saw above, the temporary scratch storage space (called Ephemeral Storage in OpenStack/Amazon world) is part of a given VM flavor. Use cases of large scratch storage space (more than ~100GB) are yet to be demonstrated to be efficient.
 
-CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set to ```/dev/vdb```.
+Question: are we imposing a limit to the ephemeral storage? If yes, are we offering a more efficient (such shared VM distributed efficient storage with full POSIX compliance) to users requiring more?
+
+CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set to
+```/dev/vdb```.
 
 
 #### filesystem labels
@@ -144,9 +146,13 @@ One possible solution is to use filesystem labels to identify ```/staging```, so
 LABEL=/staging               /staging                ext2    defaults        0 0
 ```
 
-With OpenStack, it may be possible to configure the ephemeral partition so that it has a label using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html). The default label is ```ephemeral0```. See also ```nova boot --ephemeral size=<size>[,format=<format>]```. After consulting with people at Cybera, this is a general configuration option that would affect all users, and could not be associated only with CANFAR users. It is therefore **not a good solution**.
+With OpenStack, it may be possible to configure the ephemeral partition so that it has a label using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html). The default label is ```ephemeral0```. See also ```nova boot --ephemeral size=<size>[,format=<format>]```. After consulting with people at Cybera, this is a general configuration option that would affect all users. We could ulimately replace the few Nimbus clouds (where we are the only users) scratch disk label to match the label of the OpenStack cloud default. Therefore the ```/etc/fstab``` entry would become:
 
-In the existing system, the device mounted as ```/staging``` in a vmod does not appear to have a label. However, there is something about a hard-wired partition name of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file (https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py). It may be possible to modify things so that the staging partition is indeed labeled. If it isn't possible to change the label used by OpenStack, maybe the Nimbus label could be changed to match what OpenStack uses.
+```
+LABEL=ephemeral0               /staging                ext2    defaults        0 0
+```
+
+For configuration, it will be only OpenStack so we could go with it. For batch processing, Cloud Scheduler gives a hard-coded value of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file (https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py). It may be possible to modify things so that the staging partition is indeed labeled
 
 #### init script
 
