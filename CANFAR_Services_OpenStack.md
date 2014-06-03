@@ -135,8 +135,7 @@ As we saw above, the temporary scratch storage space (called Ephemeral Storage i
 
 Question: are we imposing a limit to the ephemeral storage? If yes, are we offering a more efficient (such shared VM distributed efficient storage with full POSIX compliance) to users requiring more?
 
-CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set to
-```/dev/vdb```.
+CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set to ```/dev/vdb```.
 
 
 #### filesystem labels
