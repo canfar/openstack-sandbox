@@ -25,7 +25,7 @@ It appears that any flavor (a hardware template) can be chosen to boot a given V
 
 1. The ```Root Disk``` must be large enough to accomodate the image. If not, when executed through the OpenStack dashboard, it fails with the following message: ```Error: Instance type's disk is too small for requested image```.
 
-2. Additional minimum requirements on the ```Root Disk``` and ```RAM``` can be set *in the image* using, e.g., ```glance image-update [image_name] --min-ram=2000 --min-disk 1```.
+2. Additional minimum requirements on the ```Root Disk``` and ```RAM``` can be set *intrinsically to the VM image*, using, e.g., ```glance image-update [image_name] --min-ram=2000 --min-disk 1```.
 
 The size of an image, and the values of ```min_disk``` and ```min_ram``` may be queried from the command line with **glance**. For example, the following shows the details of a CANFAR Scientific Linux 5 VM that was modified to dual-boot under KVM and Xen:
 
@@ -128,6 +128,9 @@ Note that flavors can be customized to make them accessible only to specific use
 ```$ nova flavor-access-add <flavor-id> <project-id>```
 
 This would allow us to generate flavors that don't interfere with other users of a given OpenStack cloud. See http://docs.openstack.org/admin-guide-cloud/content/customize-flavors.html. 
+
+For batch processing, the flavors defined on OpenStack clouds will define the requirements for Nimbus.
+Question: could Cloud Scheduler actually force the fine-grained requirements on VMStorage, VMMemory, VMCores to Nimbus clouds instead of the user?
 
 ### Ephemeral storage and the /staging partition
 
@@ -313,7 +316,6 @@ When it comes to batch processing, if we intend to continue providing a URL to t
     * Whenever we start a new job (either proc, or vmod), we provide a name for the image that we want to instantiate. We would have to query all of the clouds to see which one has the newest version (with that name), and transfer a copy of it to a different target cloud if needed. If the job is executed on the same cloud where this newest version exists, no transfer is needed.
     * This is sort of like VOSpace, so we would need to ensure full sets of the data on redundant subsets of the clouds to account for downtime.
 
-## vmod time limits
+## VM time limits
 
-There is no obvious way to implement a time limit for a vmod using intrinsic features of OpenStack. However, Cloud Scheduler will have the ability to explicitly delete instances once they have timed-out (e.g., automatically issuing ```$ nova delete vmod_instance_name```), so no additional development should be required.
-
+OpenStack only supports "persistent" VMs, so VMs will remain up until a shutdown call (or a system crash). This is actually a preferable solution for the users, if enough resources are available for all users. However, for batch processing and a few hundreds VMs might boot up and lifetime management needs to be included. Cloud Scheduler already implements the ability to explicitly delete instances once they have timed-out (e.g., automatically issuing ```$ nova delete vmod_instance_name```), so no additional development should be required.
