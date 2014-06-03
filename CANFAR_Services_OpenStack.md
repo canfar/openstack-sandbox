@@ -10,6 +10,8 @@ Features that are required to implement CANFAR services include:
 
 * **A time limit for the life of an instance** (vmod/proc)
 
+* **Ability to use images created during OpenStack VMOD sessions for batch processing** (proc)
+
 ## Dynamic resource allocation
 
 CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavors**, which are specific choices for these (and other) parameters, required of the execution hardware. See http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html. The relevant parameters in OpenStack parlance are:
@@ -310,7 +312,7 @@ When it comes to batch processing, if we intend to continue providing a URL to t
 1. Use a **central** repository (i.e., VOSpace) to store the images:
     * We will need a mechanism to ensure that snapshots of running configuration instances are copied back into VOSpace so that they can later be used for batch processing. A simple solution may be a script that initiates ```nova image-create```, waits until it is done, and then uses **glance** to copy it back to VOSpace. Alternatively, if we create our own CANFAR-themed dashboard, we might add this functionality there.
     * For batch processing the scheduler will have to ensure that the correct version of the VM image exists on the target cloud. The checksum of images stored internally to an OpenStack cloud can be queried, so we can avoid unnecessarily uploading images.
-    
+
 2. A **distributed** model in which we attempt to synchronize the images stored among the various clouds as needed:
     * We wouldn't necessarily need to download a snapshot image from a cloud once a configuration session is finished.
     * Whenever we start a new job (either proc, or vmod), we provide a name for the image that we want to instantiate. We would have to query all of the clouds to see which one has the newest version (with that name), and transfer a copy of it to a different target cloud if needed. If the job is executed on the same cloud where this newest version exists, no transfer is needed.
@@ -326,3 +328,18 @@ OpenStack only supports "persistent" VMs, so VMs will remain up until a shutdown
 For persistent VM, it is necessary to have at least one floating IP available for one tenant. It is possible to work only with the VNC console for basic commands, so the IP does not have to be always available. However for heavier development on the OpenStack VM, it would be necessary to have it always available. This is a requirement we could do case by case.
 Once connected to an OpenStack cloud through either the VNC console or a floating IP, any VMs booted by the same tenant can be connected. Complex network schemes can be designed for the OpenStack tenant with the neutron client. Connecting between tenants might be possible or not, but this yet to be explored in the [documentation](http://docs.openstack.org/admin-guide-cloud/content/tenant-provider-networks.html).
 For cloud to cloud communication, one floating IP for each cloud is necessary. Between OpenStack clouds, one could discover the pool of IPs used by the tenant using the nova client, e.g. `nova floating-ip-list `.
+
+## Batch processing after OpenStack VMOD session
+
+If we use OpenStack for VMOD sessions, but continue to use Nimbus for batch processing, we will need to ensure that these images are backward compatible:
+
+* QCOW2 is the default image format for a snapshot. Is this format supported by Nimbus? **Yes** - although some configuration work is required:
+  1. install qemu-nbd on execution nodes
+  2. set qcow2 support to true (http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2-config)
+
+* Will stock images boot under Nimbus/KVM, or are further changes required (e.g., to partitions, the kernel etc.)?
+
+* How will we install software needed for batch processing? (Condor, VOS)
+  1. install condor (```apt-get|yum install condor```)
+  2. ```wget http://www.canfar.phys.uvic.ca/vospace/nodes/canfar/config/condor_config.local?view=data -O /etc/condor/condor_config.local```
+  3. then, depending on the distribution, it needs to put another file in ```/etc/init.d/coud_scheduler and /etc/sysconfig/cloud_scheduler```
