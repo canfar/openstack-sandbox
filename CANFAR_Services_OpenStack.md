@@ -127,7 +127,7 @@ Question: is managing cross-clouds flavors necessary?
 Note that flavors can be customized to make them accessible only to specific users, e.g.
 ```$ nova flavor-access-add <flavor-id> <project-id>```
 
-This would allow us to generate flavors that don't interfere with other users of a given OpenStack cloud. See http://docs.openstack.org/admin-guide-cloud/content/customize-flavors.html. 
+This would allow us to generate [flavors](http://docs.openstack.org/admin-guide-cloud/content/customize-flavors.html) that don't interfere with other users of a given OpenStack cloud. 
 
 For batch processing, the flavors defined on OpenStack clouds will define the requirements for Nimbus.
 Question: could Cloud Scheduler actually force the fine-grained requirements on VMStorage, VMMemory, VMCores to Nimbus clouds instead of the user?
@@ -141,22 +141,22 @@ Question: are we imposing a limit to the ephemeral storage? If yes, are we offer
 CANFAR VM instances have temporary storage mounted at /staging. Presently the device used for this space is hard-wired in ```/etc/fstab``` as ```/dev/sdb```. With OpenStack, **ephemeral** storage may be defined as part of the flavor. When an instance is executing under **KVM**, the local device will be set to ```/dev/vdb```.
 
 
-#### filesystem labels
+#### Handling scratch space with filesystem labels
 
 One possible solution is to use filesystem labels to identify ```/staging```, so that the ```/etc/fstab``` entry can be changed to something generic:
 ```
 LABEL=/staging               /staging                ext2    defaults        0 0
 ```
 
-With OpenStack, it may be possible to configure the ephemeral partition so that it has a label using the ```virt_mkfs``` option in ```nova.conf``` (see https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html). The default label is ```ephemeral0```. See also ```nova boot --ephemeral size=<size>[,format=<format>]```. After consulting with people at Cybera, this is a general configuration option that would affect all users. We could ulimately replace the few Nimbus clouds (where we are the only users) scratch disk label to match the label of the OpenStack cloud default. Therefore the ```/etc/fstab``` entry would become:
+With OpenStack, it may be possible to configure the ephemeral partition so that it has a label using the ```virt_mkfs``` option in ```nova.conf``` ([some doc about it](https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html]). The default label is ```ephemeral0```. See also ```nova boot --ephemeral size=<size>[,format=<format>]```. After consulting with people at Cybera, this is a general configuration option that would affect all users. We could ulimately replace the few Nimbus clouds (where we are the only users) scratch disk label to match the label of the OpenStack cloud default. Therefore the ```/etc/fstab``` entry would become:
 
 ```
 LABEL=ephemeral0               /staging                ext2    defaults        0 0
 ```
 
-For configuration, it will be only OpenStack so we could go with it. For batch processing, Cloud Scheduler gives a hard-coded value of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file (https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py). It may be possible to modify things so that the staging partition is indeed labeled
+For configuration, it will be only OpenStack so we could go with it. For batch processing, Cloud Scheduler gives a hard-coded value of ```blankdisk1``` in the cloud scheduler generation of a nimbus XML file ([link to code](https://github.com/hep-gc/cloud-scheduler/blob/master/cloudscheduler/nimbus_xml.py)). It may be possible to modify things so that the staging partition is indeed labeled
 
-#### init script
+#### Handling scratch space with init script
 
 Another brute-force method is to detect the devices at boot time using an init script.
 
@@ -297,7 +297,7 @@ OpenStack stores images internally, and they are managed using **glance** (uploa
 
     Note: The image creation happens asynchronously... we need to figure out how to query whether it's finished or not. One silly way is to check the ```status``` column for the given image name in the output from ```glance image-list```. There will certainly be something in the REST API for this.
 
-    See this web page for additional issues regarding the state of memory, disk flushes etc.: http://docs.openstack.org/trunk/openstack-ops/content/snapshots.html.
+    See [this web page](http://docs.openstack.org/trunk/openstack-ops/content/snapshots.html) for additional issues regarding the state of memory, disk flushes etc.
 
 2. **From a Horizon Dashboard instance**. This is equivalent to executing **nova** commands, and again, **glance** would be needed to copy an image into VOSpace once it is completed.
 
@@ -319,3 +319,10 @@ When it comes to batch processing, if we intend to continue providing a URL to t
 ## VM time limits
 
 OpenStack only supports "persistent" VMs, so VMs will remain up until a shutdown call (or a system crash). This is actually a preferable solution for the users, if enough resources are available for all users. However, for batch processing and a few hundreds VMs might boot up and lifetime management needs to be included. Cloud Scheduler already implements the ability to explicitly delete instances once they have timed-out (e.g., automatically issuing ```$ nova delete vmod_instance_name```), so no additional development should be required.
+
+
+## VM Pool of IP addresses
+
+For persistent VM, it is necessary to have at least one floating IP available for one tenant. It is possible to work only with the VNC console for basic commands, so the IP does not have to be always available. However for heavier development on the OpenStack VM, it would be necessary to have it always available. This is a requirement we could do case by case.
+Once connected to an OpenStack cloud through either the VNC console or a floating IP, any VMs booted by the same tenant can be connected. Complex network schemes can be designed for the OpenStack tenant with the neutron client. Connecting between tenants might be possible or not, but this yet to be explored in the [documentation](http://docs.openstack.org/admin-guide-cloud/content/tenant-provider-networks.html).
+For cloud to cloud communication, one floating IP for each cloud is necessary. Between OpenStack clouds, one could discover the pool of IPs used by the tenant using the nova client, e.g. `nova floating-ip-list `.
