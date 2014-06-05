@@ -329,17 +329,60 @@ For persistent VM, it is necessary to have at least one floating IP available fo
 Once connected to an OpenStack cloud through either the VNC console or a floating IP, any VMs booted by the same tenant can be connected. Complex network schemes can be designed for the OpenStack tenant with the neutron client. Connecting between tenants might be possible or not, but this yet to be explored in the [documentation](http://docs.openstack.org/admin-guide-cloud/content/tenant-provider-networks.html).
 For cloud to cloud communication, one floating IP for each cloud is necessary. Between OpenStack clouds, one could discover the pool of IPs used by the tenant using the nova client, e.g. `nova floating-ip-list `.
 
-## Batch processing after OpenStack VMOD session
+## Batch processing after OpenStack vmod session
 
-If we use OpenStack for VMOD sessions, but continue to use Nimbus for batch processing, we will need to ensure that these images are backward compatible:
+If we use OpenStack/kvm for vmod sessions, but continue to use Nimbus/Xen for batch processing, we will need to ensure that these images are backwards compatible.
 
-* QCOW2 is the default image format for a snapshot. Is this format supported by Nimbus? **Yes** - although some configuration work is required:
-  1. install qemu-nbd on execution nodes
+### Modifying existing VMs
+
+The most basic usage scenario is maintenance of an existing CANFAR VM that has already been upgraded to dual-boot Nimbus/Xen and OpenStack/KVM. The image would have to be uploaded to the OpenStack cloud using **glance** and then instantiated, either with **nova** commands, or through the dashboard. When configuration work is finished, there are two ways to store the work:
+
+1. Using the existing **vmstore** method within the VM, which would ultimately copy the image back to a user's VOSpace, preserving the **raw** format that is currently used (and compatible with both cloud types).
+
+2. Using the native OpenStack **snapshot** method (either through the dashboard, or executing a **nova** command outside the running VM, and then downloading the resulting image using **glance**. The image type is **qcow2** in this case.
+
+* **Nimbus may be able to execute an image stored in qcow2 format** although with a number of caveats (http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2):
+  1. install qemu-nbd on execution hosts
   2. set qcow2 support to true (http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2-config)
+  3. **kvm** is a prerequisite
+  4. **nimbus >= 1.2** is a prerequisite (versions at UVic and Breezy are not new enough)
 
-* Will stock images boot under Nimbus/KVM, or are further changes required (e.g., to partitions, the kernel etc.)?
+  None of this is successfully tested yet.
 
-* How will we install software needed for batch processing? (Condor, VOS)
-  1. install condor (```apt-get|yum install condor```)
-  2. ```wget http://www.canfar.phys.uvic.ca/vospace/nodes/canfar/config/condor_config.local?view=data -O /etc/condor/condor_config.local```
-  3. then, depending on the distribution, it needs to put another file in ```/etc/init.d/coud_scheduler and /etc/sysconfig/cloud_scheduler```
+* **qcow2 images can be converted back to raw:** ```sudo virt-sparsify --convert raw vm_12.04_staging_snapshot_qcow2.img vm_12.04_staging_snapshot_raw.img```
+  It has been demonstrated that these raw-converted images can boot both under Nimbus/Xen and OpenStack/KVM.
+
+### Creating new VMs from stock images
+
+The other usage scenario is the creation of completely new VMs.
+
+* We can continue to support **dual-bootable golden images** using the Linux distributions of our choosing (probably dropping SL5)
+
+* It would be nice to support **stock cloud images provided by major distributions**. However, there are a number of issues:
+  1. We will need to provide scripts, or at least describe, the installation of software required by our batch system:
+      1. install condor (```apt-get|yum install condor```)
+      2. ```wget http://www.canfar.phys.uvic.ca/vospace/nodes/canfar/config/condor_config.local?view=data -O /etc/condor/condor_config.local```
+      3. then, depending on the distribution, it needs to put another file in ```/etc/init.d/coud_scheduler and /etc/sysconfig/cloud_scheduler```
+  2. We will need to convert the resulting qcow2 images into raw format
+  3. **Initial tests** to boot stock cloud Ubuntu 14.04 images (converted to raw format) have been **unsuccessful**.
+     Perhaps the problem is that hosts are using Scientific Linux 5 with no support for ext4 filesystems? Tried converting to ext3:
+    ```
+    $ truncate -s 5368709120 test_14.04_snapshot_raw_ext3.img
+    $ virt-format -a test_14.04_snapshot_raw_ext3.img --partition=mbr --filesystem=ext3
+    $ sudo guestfish --ro -a test_14.04_snapshot_raw.img -m /dev/sda1  -- tar-out / - | sudo guestfish --rw -a test_14.04_snapshot_raw_ext3.img -m /dev/sda1 -- tar-in - /
+    ```
+    This procedure will lose the bootloader, so install **SYSLINUX** from guestfish. Update ```/boot/syslinux.cfg``` and ```/etc/fstab```. Also ```set-e2label /dev/sda1 cloudimg-rootfs```.
+
+    This gets us to:
+
+    ```
+    Booting from Hard Disk...
+    Booting the kernel
+    Loading /boot/vmlinuz-3.13.0-24-generic........
+    Loading /boot/initrd.img-3.13.0-24-generic.........ready.
+    ```
+    at which point it halts.
+    Further tests ongoing...
+
+
+
