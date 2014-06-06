@@ -337,14 +337,19 @@ For cloud to cloud communication, one floating IP for each cloud is necessary. B
 
 Cloud Scheduler already has the ability to execute proc jobs using either Nimbus or OpenStack clouds; a feature that is already used in production by the HEP group at UVic.
 
-The modifications to Cloud Scheduler provide a very basic interface. Job submission files must contain both the **Nimbus requirements**: cores, memory, staging space and VM URL (e.g., to VOSpace); and the **OpenStack equivalents**: a flavor, and the name of the VM image (which must have been uploaded previously to the cloud using glance).
+The modifications to Cloud Scheduler provide a very basic interface to condor. For jobs to run on an OpenStack cloud, it will need:
+```
++VMLoc = "http://canfar/myimage"
++VMAMI = "synnefo_openstack:ami-0000001, cybera:ami-0200021 "
++VMInstanceType = "synnefo:m1.xlarge"
+```
+The AMI number is necessary right now, but by the time we end up using the OpenStack cloud, the native API of Cloud Scheduler to OpenStack will allow us to refer VM with names.
+Job submission files that will run on both Nimbus clouds and OpenStack clouds, must contain both the **Nimbus requirements**: cores, memory, staging space and VM URL (e.g., to VOSpace); and the **OpenStack requirements** above.
 
 This interface will be slightly clumsy to users, but workable during a transition period. However, the following issues must be considered:
 
 * The VMs must have undergone the dual-boot (Xen/KVM) conversion)
-
 * The user must ensure that the Nimbus execution requirements match the OpenStack flavor that they are requesting.
-
 * If we continue to use the existing CANFAR vmod service to provision VMs for batch processing, both **vmsave** (to store a copy of the image in VOSpace), and **glance image-create** (to upload the image to the OpenStack cloud(s)) will be necessary. Perhaps **vmsave** can perform both tasks?
 
 
