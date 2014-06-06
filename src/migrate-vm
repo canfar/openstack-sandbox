@@ -1,0 +1,87 @@
+#!/usr/bin/python                                                                                                                                                                 
+
+import sys
+import os
+import guestfs
+import argparse
+import re
+
+# Dictionary of known OS types (keys) and type strings (values) that
+# will be used to pattern match the product name string
+valid_os_type = { "sl5" : "Scientific Linux release 5",
+                  "sl6" : "Scientific Linux release 6",
+                  "ub12" : "Ubuntu 12.04",
+                  "ub13" : "Ubuntu 13.10" }
+
+# parse command line
+parser = argparse.ArgumentParser(description='Migrate old Xen-style CANFAR VMs for compatibility with OpenStack/KVM')
+parser.add_argument('--inputimage', required=True, help='Input VM image')
+parser.add_argument('--outputimage', required=True, help='Converted output VM image')
+args = parser.parse_args()
+
+
+try:
+    # First get size and make a sparse output image
+    print "Try making a sparse output image %s..." % (args.outputimage)
+    size = os.path.getsize(args.inputimage)
+    f = open(args.outputimage,'ab')
+    f.truncate(size)
+    f.close()
+except:
+    print "FAILED: couldn't create the image"
+    sys.exit(1)
+
+# create a guestfs handle, add the input and output images, and run the guestfs back-end
+try:
+    print "Try opening %s read-only, and %s for write" % (args.inputimage, args.outputimage)
+    g = guestfs.GuestFS(python_return_dict=True)
+    g.add_drive_opts(args.inputimage, format="raw", readonly=1)
+    g.add_drive_opts(args.outputimage, format="raw", readonly=0)
+
+    # After the following the input image will be /dev/sda, and the output image /dev/sdb
+    g.launch()
+except:
+    print "FAILED: perhaps you need to run this script with root privileges?"
+    sys.exit(1)
+
+# Figure out which OS type is installed on the image. Assume only 1 root.
+try:
+    print "Identifying the operating system..."
+    roots = g.inspect_os()
+    root = roots[0]
+    print "Found root %s" % (root)
+    product_name = g.inspect_get_product_name(root)
+    print product_name
+
+    os_type = None
+    for check_type in valid_os_type:
+        if re.search(valid_os_type[check_type],product_name):
+            os_type=check_type
+            continue
+
+    if os_type is None:
+        print "Product name string could not be converted to a known OS"
+        raise
+
+except:
+    print "FAILED: couldn't find a known OS."
+    sys.exit(1)
+
+print "*** We are working with a %s image." % (os_type)
+
+# Create a new partitioned version of the VM if needed.  We do this by
+# checking if root is a partition. If not it is a device.
+partitions = g.list_partitions()
+
+if root not in partitions:
+    try:
+        print "Initializing the partition..."
+        g.part_init('/dev/sdb', 'mbr')
+        g.part_add('/dev/sdb', 'p', 2048, -2048)
+
+        print "Copying data to the partition..."
+        g.copy_device_to_device(root, '/dev/sdb1') # sparse=True "Invalid argument"?
+
+    except:
+        print "FAILED"
+        sys.exit(1)
