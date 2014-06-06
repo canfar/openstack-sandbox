@@ -151,7 +151,7 @@ One possible solution is to use filesystem labels to identify ```/staging```, so
 LABEL=/staging               /staging                ext2    defaults        0 0
 ```
 
-With OpenStack, it may be possible to configure the ephemeral partition so that it has a label using the ```virt_mkfs``` option in ```nova.conf``` ([some information about it](https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html]). The default label is ```ephemeral0```. See also ```nova boot --ephemeral size=<size>[,format=<format>]```. After consulting with people at Cybera, this is a general configuration option that would affect all users. We could ulimately replace the few Nimbus clouds (where we are the only users) scratch disk label to match the label of the OpenStack cloud default. Therefore the ```/etc/fstab``` entry would become:
+With OpenStack, it may be possible to configure the ephemeral partition so that it has a label using the ```virt_mkfs``` option in ```nova.conf``` ([some information about it](https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux_OpenStack_Platform/4/html/Configuration_Reference_Guide/list-of-compute-config-options.html)). The default label is ```ephemeral0```. See also ```nova boot --ephemeral size=<size>[,format=<format>]```. After consulting with people at Cybera, this is a general configuration option that would affect all users. We could ulimately replace the few Nimbus clouds (where we are the only users) scratch disk label to match the label of the OpenStack cloud default. Therefore the ```/etc/fstab``` entry would become:
 
 ```
 LABEL=ephemeral0               /staging                ext2    defaults        0 0
@@ -320,6 +320,7 @@ When it comes to batch processing, if we intend to continue providing a URL to t
     * We wouldn't necessarily need to download a snapshot image from a cloud once a configuration session is finished.
     * Whenever we start a new job (either proc, or vmod), we provide a name for the image that we want to instantiate. We would have to query all of the clouds to see which one has the newest version (with that name), and transfer a copy of it to a different target cloud if needed. If the job is executed on the same cloud where this newest version exists, no transfer is needed.
     * This is sort of like VOSpace, so we would need to ensure full sets of the data on redundant subsets of the clouds to account for downtime.
+    * The HEP group at UVic is already developing something called [glint](https://github.com/canfar/openstack-sandbox/blob/master/CANFAR_user_interface.md#image-distribution-using-glint) that may provide the functionality that we need.
 
 ## VM time limits
 
