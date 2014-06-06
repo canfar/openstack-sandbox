@@ -1,6 +1,6 @@
 # CANFAR (vmod+proc) services with OpenStack
 
-This document explores the implementation CANFAR vmod and proc services with OpenStack using VMs modified to run in the KVM hypervisor (https://github.com/canfar/openstack-sandbox/blob/master/CANFAR2OpenStack.md). The test environment for this work is the Cybera Rapid Access Cloud (https://github.com/canfar/openstack-sandbox#cybera-test-environment).
+This document explores the implementation CANFAR vmod and proc services with OpenStack using VMs modified to run in the KVM hypervisor (https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR2OpenStack.md). The test environment for this work is the Cybera Rapid Access Cloud (https://github.com/canfar/openstack-sandbox/blob/master/doc/initial_tests.md#cybera-test-environment).
 
 Features that are required to implement CANFAR services include:
 
@@ -320,7 +320,7 @@ When it comes to batch processing, if we intend to continue providing a URL to t
     * We wouldn't necessarily need to download a snapshot image from a cloud once a configuration session is finished.
     * Whenever we start a new job (either proc, or vmod), we provide a name for the image that we want to instantiate. We would have to query all of the clouds to see which one has the newest version (with that name), and transfer a copy of it to a different target cloud if needed. If the job is executed on the same cloud where this newest version exists, no transfer is needed.
     * This is sort of like VOSpace, so we would need to ensure full sets of the data on redundant subsets of the clouds to account for downtime.
-    * The HEP group at UVic is already developing something called [glint](https://github.com/canfar/openstack-sandbox/blob/master/CANFAR_user_interface.md#image-distribution-using-glint) that may provide the functionality that we need.
+    * The HEP group at UVic is already developing something called [glint](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_user_interface.md#image-distribution-using-glint) that may provide the functionality that we need.
 
 ## VM time limits
 

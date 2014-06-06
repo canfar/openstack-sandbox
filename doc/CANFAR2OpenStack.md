@@ -13,7 +13,7 @@ There are two main differences between **Xen** and **KVM** that are relevant to 
 
 ## Prerequisites
 
-The test environment for this work is the Cybera Rapid Access Cloud (http://www.cybera.ca/projects/cloud-resources/rapid-access-cloud/). Modifications to CANFAR VMs are made using an Ubuntu 14.04 provisioning VM running on the Cybera RAC (to obtain root access). The modified images are then uploaded using **glance** from this provisioning VM, and finally executed for testing purposes from the **OpenStack dashboard**. For further details on how it was used, see https://github.com/canfar/openstack-sandbox#cybera-test-environment.
+The test environment for this work is the Cybera Rapid Access Cloud (http://www.cybera.ca/projects/cloud-resources/rapid-access-cloud/). Modifications to CANFAR VMs are made using an Ubuntu 14.04 provisioning VM running on the Cybera RAC (to obtain root access). The modified images are then uploaded using **glance** from this provisioning VM, and finally executed for testing purposes from the **OpenStack dashboard**. For further details on how it was used, see https://github.com/canfar/openstack-sandbox/blob/master/doc/initial_tests.md#cybera-test-environment.
 
 A software suite called **libguestfs** is used to modify VMs. It provides a number of tools (especially **guestfish**) that are scriptable. To install on an Ubuntu system:
 ```
@@ -304,7 +304,7 @@ The VM conversion to KVM as described in the previous section has the advantage 
 
 3. **Mount /staging**
 
-    The ```/staging``` partition is provided by different devices under **Xen/KVM**. The following link gives two potential methods for tackling this problem: https://github.com/canfar/openstack-sandbox/blob/master/CANFAR_Services_OpenStack.md#mounting-the-staging-partition
+    The ```/staging``` partition is provided by different devices under **Xen/KVM**. The following link gives two potential methods for tackling this problem: https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_Services_OpenStack.md#ephemeral-storage-and-the-staging-partition
 
 4. **OS-specific modifications**
 
