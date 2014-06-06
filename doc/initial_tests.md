@@ -1,4 +1,4 @@
-# CANFAR Migration to OpenStack
+# Initial tests with CANFAR VMs in OpenStack
 
 Summarized here are some initial experiments modifying CANFAR Xen-based VMs (images) so that they can be executed with the OpenStack hypervisor.
 
