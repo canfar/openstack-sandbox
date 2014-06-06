@@ -332,7 +332,22 @@ For persistent VMs, it is necessary to have at least one floating IP available f
 Once connected to an OpenStack cloud through either the VNC console or a floating IP, any VMs booted by the same tenant can be connected. Complex network schemes can be designed for the OpenStack tenant with the neutron client. Connecting between tenants may or may not be possible, but this has yet to be explored in the [documentation](http://docs.openstack.org/admin-guide-cloud/content/tenant-provider-networks.html).
 For cloud to cloud communication, one floating IP for each cloud is necessary. Between OpenStack clouds, one could discover the pool of IPs used by the tenant using the nova client, e.g. `nova floating-ip-list `.
 
-## Batch processing after OpenStack vmod session
+## Cloud Scheduler and OpenStack clouds
+
+Cloud Scheduler already has the ability to execute proc jobs using either Nimbus or OpenStack clouds; a feature that is already used in production by the HEP group at UVic.
+
+The modifications to Cloud Scheduler provide a very basic interface. Job submission files must contain both the **Nimbus requirements**: cores, memory, staging space and VM URL (e.g., to VOSpace); and the **OpenStack equivalents**: a flavor, and the name of the VM image (which must have been uploaded previously to the cloud using glance).
+
+This interface will be slightly clumsy to users, but workable during a transition period. However, the following issues must be considered:
+
+* The VMs must have undergone the dual-boot (Xen/KVM) conversion)
+
+* The user must ensure that the Nimbus execution requirements match the OpenStack flavor that they are requesting.
+
+* If we continue to use the existing CANFAR vmod service to provision VMs for batch processing, both **vmsave** (to store a copy of the image in VOSpace), and **glance image-create** (to upload the image to the OpenStack cloud(s)) will be necessary. Perhaps **vmsave** can perform both tasks?
+
+
+## Nimbus batch processing after OpenStack vmod sessions
 
 If we use OpenStack/KVM for vmod sessions, but continue to use Nimbus/Xen for batch processing, we will need to ensure that these images are backwards compatible.
 
@@ -483,7 +498,7 @@ The other usage scenario is the creation of completely new VMs.
      Perhaps the problem is that hosts are using Scientific Linux 5 with no support for ext4 filesystems? Tried converting to ext3:
     ```
     $ truncate -s 5368709120 test_14.04_snapshot_raw_ext3.img
-    $ virt-format -a test_14.04_snapshot_raw_ext3.img --partition=mbr --filesystem=ext3
+    $ sudo virt-format -a test_14.04_snapshot_raw_ext3.img --partition=mbr --filesystem=ext3
     $ sudo guestfish --ro -a test_14.04_snapshot_raw.img -m /dev/sda1  -- tar-out / - | sudo guestfish --rw -a test_14.04_snapshot_raw_ext3.img -m /dev/sda1 -- tar-in - /
     ```
     This procedure will lose the bootloader, so install **SYSLINUX** from guestfish. Update ```/boot/syslinux.cfg``` and ```/etc/fstab```. Also ```set-e2label /dev/sda1 cloudimg-rootfs```.
