@@ -1,6 +1,6 @@
-# CANFAR (vmod+proc) services with OpenStack
+# CANFAR VMOD and PROC equivalent services with OpenStack
 
-This document explores the implementation CANFAR vmod and proc services with OpenStack using VMs modified to run in the KVM hypervisor (https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR2OpenStack.md). The test environment for this work is the Cybera Rapid Access Cloud (https://github.com/canfar/openstack-sandbox/blob/master/doc/initial_tests.md#cybera-test-environment).
+This document explores the implementation CANFAR VMOD and proc services with OpenStack, using VMs from CANFAR users, modified to run in the KVM hypervisor. The migration [document](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR2OpenStack.md) might be of interest as well. The test environment for this work is the [Cybera Rapid Access Cloud](https://github.com/canfar/openstack-sandbox/blob/master/doc/initial_tests.md#cybera-test-environment).
 
 Features that are required to implement CANFAR services include:
 
@@ -14,7 +14,7 @@ Features that are required to implement CANFAR services include:
 
 ## Dynamic resource allocation
 
-CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavors**, which are specific choices for these (and other) parameters, required of the execution hardware. See http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html. The relevant parameters in OpenStack parlance are:
+CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavors**, which are specific choices for these (and other) parameters, required of the execution hardware. Flavors are [documented](http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html). The relevant parameters in OpenStack parlance are:
 
 | Parameter            | Meaning                                                |
 |----------------------|--------------------------------------------------------|
@@ -360,13 +360,14 @@ The most basic usage scenario is maintenance of an existing CANFAR VM that has a
 
 2. Using the native OpenStack **snapshot** method (either through the dashboard, or executing a **nova** command outside the running VM), and then downloading the resulting image using **glance**. The image type is **qcow2** in this case.
 
-* **Nimbus may be able to execute an image stored in qcow2 format** although with a number of caveats (http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2):
-  1. install qemu-nbd on execution hosts
+* **Nimbus may be able to execute an image stored in qcow2 format** (as reference [here](http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2)) although with a number of modifications:
+  1. install qemu-nbd, qemu, qemu-img on execution hosts
   2. set qcow2 support to true (http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2-config)
-  3. **KVM** is a prerequisite
-  4. **nimbus >= 1.2** is a prerequisite (versions at UVic and Breezy are not new enough)
-
-  None of this has been successfully tested yet.
+  3. **KVM** is a prerequisite, so the SL5 kernel on all processing nodes has to be switched to Xen support
+  4. **nimbus >= 2.10** is a prerequisite (versions at UVic and Breezy are not new enough)
+  5. modify Nimbus to support qemu < 1 call API (in src/python/workspacecontrol/defaults/ImageEditing.py)
+  6. modify etc/workspace-controls/{networks,libvirt}.conf and change kvm/qemu instead of xen
+Some early tests showed we were able to boot a VM like that, but unsuccessful
 
 * **qcow2 images can be converted back to raw:**
   * ```qemu-img convert -f qcow2 -O raw vm_12.04_staging_snapshot.qcow2 vm_12.04_staging_snapshot.img``` - **very fast**, sparse image file.
