@@ -1,4 +1,4 @@
-#!/usr/bin/python                                                                                                                                                                 
+#!/usr/bin/env python
 
 import sys
 import os
@@ -16,9 +16,13 @@ valid_os_type = { "sl5" : "Scientific Linux release 5",
 # parse command line
 parser = argparse.ArgumentParser(description='Migrate old Xen-style CANFAR VMs for compatibility with OpenStack/KVM')
 parser.add_argument('--inputimage', required=True, help='Input VM image')
-parser.add_argument('--outputimage', required=True, help='Converted output VM image')
+parser.add_argument('--outputimage', required=True,
+                    help='Converted output VM image')
 args = parser.parse_args()
 
+# Check pre-requisites
+# Reference:
+#   http://rwmj.wordpress.com/2013/04/04/new-in-libguestfs-use-syslinux-or-extlinux-to-make-bootable-guests/)
 
 try:
     # First get size and make a sparse output image
@@ -31,17 +35,44 @@ except:
     print "FAILED: couldn't create the image"
     sys.exit(1)
 
-# create a guestfs handle, add the input and output images, and run the guestfs back-end
+# create a guestfs handle, add the input and output images, and run
+# the guestfs back-end
 try:
-    print "Try opening %s read-only, and %s for write" % (args.inputimage, args.outputimage)
+    print "Try opening %s read-only, and %s for write..."\
+        % (args.inputimage, args.outputimage)
     g = guestfs.GuestFS(python_return_dict=True)
     g.add_drive_opts(args.inputimage, format="raw", readonly=1)
     g.add_drive_opts(args.outputimage, format="raw", readonly=0)
 
-    # After the following the input image will be /dev/sda, and the output image /dev/sdb
+    # After the following the input image will be /dev/sda, and the
+    # output image /dev/sdb
     g.launch()
 except:
     print "FAILED: perhaps you need to run this script with root privileges?"
+    sys.exit(1)
+
+
+# Check for extlinux and load in mbr.bin
+
+print "Checking for extlinux and loading mbr.bin..."
+
+if not g.feature_available(['extlinux']):
+    print "FAILED: extlinux is not available to this version of libguestfs"
+    sys.exit(1)
+
+mbr = "/usr/share/extlinux/mbr.bin"
+if not os.path.isfile(mbr):
+    mbr = "/usr/lib/extlinux/mbr.bin"
+    if not os.path.isfile(mbr):
+        print "FAILED: couldn't locate mbr.bin. Have you installed extlinux?"
+        sys.exit(1)
+
+f = open(mbr, 'rb')
+mbr_data = f.read()
+f.close()
+
+if len(mbr_data) != 440:
+    print "FAILED: %s should have a length of 440 bytes" % (mbr)
     sys.exit(1)
 
 # Figure out which OS type is installed on the image. Assume only 1 root.
@@ -69,8 +100,7 @@ except:
 
 print "*** We are working with a %s image." % (os_type)
 
-# Create a new partitioned version of the VM if needed.  We do this by
-# checking if root is a partition. If not it is a device.
+# Create a new partitioned version of the VM.
 partitions = g.list_partitions()
 
 if root not in partitions:
@@ -80,7 +110,8 @@ if root not in partitions:
         g.part_add('/dev/sdb', 'p', 2048, -2048)
 
         print "Copying data to the partition..."
-        g.copy_device_to_device(root, '/dev/sdb1') # sparse=True "Invalid argument"?
+        g.copy_device_to_device(root, '/dev/sdb1')
+        # sparse=True "Invalid argument"?
 
     except:
         print "FAILED"
