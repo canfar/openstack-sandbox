@@ -5,8 +5,9 @@ import os
 import guestfs
 import argparse
 import re
+import traceback
 
-# Dictionary of known OS types (keys) and type strings (values) that
+# Dictionary of known OS types (keys), and type strings (values) that
 # will be used to pattern match the product name string
 valid_os_type = { "sl5" : "Scientific Linux release 5",
                   "sl6" : "Scientific Linux release 6",
@@ -23,56 +24,61 @@ args = parser.parse_args()
 # Check pre-requisites
 # Reference:
 #   http://rwmj.wordpress.com/2013/04/04/new-in-libguestfs-use-syslinux-or-extlinux-to-make-bootable-guests/)
-
 try:
     # First get size and make a sparse output image
     print "Try making a sparse output image %s..." % (args.outputimage)
-    size = os.path.getsize(args.inputimage)
+
+    # Note that we tack on 4096 sectors * 512 bytes/sector to leave
+    # some extra space for the partitioning in the 'part_add' call below
+    size = os.path.getsize(args.inputimage) + 512 * 4096
     f = open(args.outputimage,'ab')
     f.truncate(size)
     f.close()
 except:
-    print "FAILED: couldn't create the image"
+    traceback.print_exc(file=sys.stdout)
+    print "FAILED: couldn't create output image %s" % (args.outputimage)
     sys.exit(1)
 
 # create a guestfs handle, add the input and output images, and run
 # the guestfs back-end
 try:
-    print "Try opening %s read-only, and %s for write..."\
+    print "Try opening %s read-only, and %s for write..." \
         % (args.inputimage, args.outputimage)
     g = guestfs.GuestFS(python_return_dict=True)
-    g.add_drive_opts(args.inputimage, format="raw", readonly=1)
-    g.add_drive_opts(args.outputimage, format="raw", readonly=0)
+    g.add_drive_opts(args.inputimage, format="raw", readonly=True)
+    g.add_drive_opts(args.outputimage, format="raw", readonly=False)
 
     # After the following the input image will be /dev/sda, and the
     # output image /dev/sdb
     g.launch()
 except:
+    traceback.print_exc(file=sys.stdout)
     print "FAILED: perhaps you need to run this script with root privileges?"
     sys.exit(1)
 
 
 # Check for extlinux and load in mbr.bin
-
 print "Checking for extlinux and loading mbr.bin..."
 
-if not g.feature_available(['extlinux']):
-    print "FAILED: extlinux is not available to this version of libguestfs"
-    sys.exit(1)
+try:
+    if not g.feature_available(['extlinux']):
+        raise Exception("libguestfs can't find extlinux")
 
-mbr = "/usr/share/extlinux/mbr.bin"
-if not os.path.isfile(mbr):
-    mbr = "/usr/lib/extlinux/mbr.bin"
+    mbr = "/usr/share/extlinux/mbr.bin"
     if not os.path.isfile(mbr):
-        print "FAILED: couldn't locate mbr.bin. Have you installed extlinux?"
-        sys.exit(1)
+        mbr = "/usr/lib/extlinux/mbr.bin"
+        if not os.path.isfile(mbr):
+            raise Exception("Couldn't locate mbr.bin")
 
-f = open(mbr, 'rb')
-mbr_data = f.read()
-f.close()
+    f = open(mbr, 'rb')
+    mbr_data = f.read()
+    f.close()
 
-if len(mbr_data) != 440:
-    print "FAILED: %s should have a length of 440 bytes" % (mbr)
+    if len(mbr_data) != 440:
+        raise "%s should have a length of 440 bytes" % (mbr)
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "FAILED: problem with extlinux. Have you installed it? correctly?"
     sys.exit(1)
 
 # Figure out which OS type is installed on the image. Assume only 1 root.
@@ -91,28 +97,28 @@ try:
             continue
 
     if os_type is None:
-        print "Product name string could not be converted to a known OS"
-        raise
+        raise Exception("Product name could not be converted to a known OS")
 
 except:
+    traceback.print_exc(file=sys.stdout)
     print "FAILED: couldn't find a known OS."
     sys.exit(1)
 
-print "*** We are working with a %s image." % (os_type)
+print "*** We are working with an %s image." % (os_type)
 
 # Create a new partitioned version of the VM.
-partitions = g.list_partitions()
+#partitions = g.list_partitions()
+#if root not in partitions:
+try:
+    print "Initializing the partition in %s..." % (args.outputimage)
+    g.part_init('/dev/sdb', 'mbr')
+    g.part_add('/dev/sdb', 'p', 2048, -2048)
 
-if root not in partitions:
-    try:
-        print "Initializing the partition..."
-        g.part_init('/dev/sdb', 'mbr')
-        g.part_add('/dev/sdb', 'p', 2048, -2048)
+    print "Copying data to the partition..."
+    g.copy_device_to_device(root, '/dev/sdb1', sparse=True)
 
-        print "Copying data to the partition..."
-        g.copy_device_to_device(root, '/dev/sdb1')
-        # sparse=True "Invalid argument"?
-
-    except:
-        print "FAILED"
-        sys.exit(1)
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "FAILED: Couldn't copy to %s. Perhaps it is too small?" % \
+        (args.outputimage)
+    sys.exit(1)
