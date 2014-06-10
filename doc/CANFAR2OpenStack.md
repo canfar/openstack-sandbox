@@ -161,7 +161,7 @@ $ sudo apt-get install extlinux
         $ mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk initrd-2.6.18-371.8.1.el5.img 2.6.18-371.8.1.el5
         ```
 
-        Note that this command is copied verbatim from the example linked above, and the ```--builtin=xenblk``` is probably irrelevant to this kernel since it does not support **Xen**.
+        Note that this command is copied verbatim from the example linked above, and the ```--builtin=xenblk``` is relevant to this kernel since it seems to account for the fact that it does not support **Xen**.
 
         Exit **chroot** and **guestunmount** the image:
 
