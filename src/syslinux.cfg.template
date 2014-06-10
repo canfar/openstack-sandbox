@@ -1,0 +1,6 @@
+DEFAULT linux
+LABEL linux
+  SAY Booting the kernel
+  KERNEL ${KERNEL}
+  INITRD ${INITRD}
+  APPEND ro root=${ROOT}

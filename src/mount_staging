@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# Mount /staging
+#
+# - Under OpenStack/KVM we expect nova to add the label "ephemeral0"
+#   on /dev/vdb
+#
+# - Under Nimbus/Xen we expect the label "blankpartition0"
+#   on /dev/sdb or /dev/xvdb depending on the distro
+#
+
+# Already Mounted?
+if grep -q /staging /etc/mtab; then
+    exit 0
+fi
+
+# Create mount point if needed
+mkdir -p /staging
+
+# Choose a device
+if [ -b /dev/disk/by-label/ephemeral0 ]; then
+    # The nova default for OpenStack
+    DEVICE=/dev/disk/by-label/ephemeral0
+
+elif [ -b /dev/disk/by-label/blankpartition0 ]; then
+    # The label expected for Nimbus/Xen
+    DEVICE=/dev/disk/by-label/blankpartition0
+
+elif [ -b /dev/vdb ]; then
+    # If no label, this might be the device under KVM
+    DEVICE=/dev/vdb
+
+elif [ -b /dev/sdb ]; then
+    # If no label, this might be the device under Xen (SL 5)
+    DEVICE=/dev/sdb
+
+elif [ -b /dev/xvdb ]; then
+    # If no label, this might be the device under Xen (Ubuntu 12.04)
+    DEVICE=/dev/xvdb
+
+else
+    echo "Couldn't mount /staging! No valid device could be found."
+    exit 1
+fi
+
+# Try mounting
+mount -o defaults ${DEVICE} /staging
+
+if [ "$?" -ne "0" ]; then
+    echo "Failed to mount ${DEVICE} at /staging."
+    exit 1
+fi
