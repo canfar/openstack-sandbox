@@ -183,7 +183,7 @@ if os_type is 'sl5':
             kernel_version = m.group(1)
         else:
             raise Exception("Couldn't get installed kernel from yum.log")
-        initrd_name = "initrd-%s.el5.img" % (kernel_version)
+        initrd_name = "initrd-%s.img" % (kernel_version)
         os.rename("%s/boot/%s" % (guestos,initrd_name), \
                   "%s/boot/%s.backup" % (guestos,initrd_name))
 
