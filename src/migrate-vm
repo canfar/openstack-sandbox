@@ -1,4 +1,10 @@
 #!/usr/bin/env python
+#
+# This script primarily uses libguestfs to modify raw CANFAR VM images
+# suitable for Nimbus/Xen so that they will also run on OpenStack/KVM clouds.
+# The algorithm to make these "dual-boot" VMs is described here:
+#
+# https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR2OpenStack.md
 
 import sys
 import os
@@ -8,6 +14,7 @@ import re
 import traceback
 import subprocess
 import shutil
+import operator
 
 # Dictionary of known OS types (keys), and type strings (values) that
 # will be used to pattern match the product name string
@@ -36,17 +43,25 @@ guestos='./guestos'
 
 # do we have kpartx installed?
 try:
+    print "+++ Checking for kpartx..."
     subprocess.check_call("which kpartx", shell=True)
 except:
-    print "ERROR: you need to install kpartx"
+    print "--- ERROR: you need to install kpartx"
     sys.exit(1)
+
+
+
+# -----------------------------------------------------------------------------
+# Initial setup of output image, start guestfs, check dependencies
+# -----------------------------------------------------------------------------
 
 # Create a new, sparse output image
 # Reference:
 #   http://rwmj.wordpress.com/2013/04/04/new-in-libguestfs-use-syslinux-or-extlinux-to-make-bootable-guests/)
+
 try:
     # First get size and make a sparse output image
-    print "Try making a sparse output image %s..." % (outputimage)
+    print "+++ Try making a sparse output image %s..." % (outputimage)
 
     # Note that we tack on 4096 sectors * 512 bytes/sector to leave
     # some extra space for the partitioning in the 'part_add' call below
@@ -56,13 +71,13 @@ try:
     f.close()
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: couldn't create output image %s" % (outputimage)
+    print "--- ERROR: couldn't create output image %s" % (outputimage)
     sys.exit(1)
 
 # create a guestfs handle, add the input and output images, and run
 # the guestfs back-end
 try:
-    print "Try opening %s read-only, and %s for write..." \
+    print "+++ Try opening %s read-only, and %s for write..." \
         % (inputimage, outputimage)
     g = guestfs.GuestFS(python_return_dict=True)
     g.add_drive_opts(inputimage, format="raw", readonly=True)
@@ -73,12 +88,12 @@ try:
     g.launch()
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: perhaps you need to run this script with root privileges?"
+    print "--- ERROR: perhaps you need to run this script with root privileges?"
     sys.exit(1)
 
 # Check for extlinux and load in mbr.bin
 try:
-    print "Checking for extlinux and loading mbr.bin..."
+    print "+++ Checking for extlinux and loading mbr.bin..."
     if not g.feature_available(['extlinux']):
         raise Exception("libguestfs can't find extlinux")
 
@@ -96,15 +111,15 @@ try:
         raise "%s should have a length of 440 bytes" % (mbr)
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: problem with extlinux. Have you installed it? correctly?"
+    print "--- ERROR: problem with extlinux. Have you installed it? correctly?"
     sys.exit(1)
 
 # Figure out which OS type is installed on the image. Assume only 1 root.
 try:
-    print "Identifying the image operating system..."
+    print "+++ Identifying the image operating system..."
     roots = g.inspect_os()
     root = roots[0]
-    print "Found root %s" % (root)
+    print "+++ Found root %s" % (root)
     product_name = g.inspect_get_product_name(root)
     print product_name
 
@@ -119,45 +134,57 @@ try:
 
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: couldn't find a known OS."
+    print "--- ERROR: couldn't find a known OS."
     sys.exit(1)
 
-print "*** We are working with an %s image." % (os_type)
+print "+++ We are working with an ^^^ %s ^^^ image" % (os_type)
 
+
+
+# -----------------------------------------------------------------------------
 # Create a new partitioned version of the VM.
-#partitions = g.list_partitions()
-#if root not in partitions:
+# -----------------------------------------------------------------------------
+
 try:
-    print "Initializing the partition in %s..." % (outputimage)
+    print "+++ Initializing the partition in %s..." % (outputimage)
     g.part_init('/dev/sdb', 'mbr')
     g.part_add('/dev/sdb', 'p', 2048, -2048)
 
-    print "Copying data to the partition..."
+    print "+++ Copying data to the partition..."
     g.copy_device_to_device(root, '/dev/sdb1', sparse=True)
 
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: Couldn't copy to %s. Perhaps it is too small?" % \
+    print "--- ERROR: Couldn't copy to %s. Perhaps it is too small?" % \
         (outputimage)
     sys.exit(1)
 
-# If this is SL5, we need to install the regular, non-xen kernel which
-# will be used by KVM (and get its boot parameters from
-# syslinux.cfg). When booting under xen, PyGrub will still pick up the
-# old settings in /boot/grub/menu.lst.
+
+
+# -----------------------------------------------------------------------------
+# Install generic kernel if SL5
+# -----------------------------------------------------------------------------
+
+# We need to install the regular, non-xen kernel which will be used by
+# KVM (and get its boot parameters from syslinux.cfg). When booting
+# under xen, PyGrub will still pick up the old settings in
+# /boot/grub/menu.lst.
+
 if os_type is 'sl5':
     try:
-        print "For Scientific Linux 5 we need to install a generic kernel"
+        print "+++ For Scientific Linux 5 we need to install a generic kernel"
 
         if not os.path.exists(guestos):
-            print "Creating %s to guest mount the image" % (guestos)
+            print "+++ Creating %s to guest mount the image" % (guestos)
             os.makedirs(guestos)
         else:
-            print "%s already exists for guest mounting the image" % (guestos)
+            print "+++ %s already exists for guest mounting the image" % \
+                (guestos)
 
         # Mount the image using loop. See:
         # http://manual.futuregrid.org/nimbus.html
-        print "Mounting image in the local filesystem at %s ..." % (guestos)
+        print "+++ Mounting image in the local filesystem at %s ..." % \
+            (guestos)
 
         subprocess.check_call("losetup /dev/loop0 %s" % (outputimage),
                               shell=True)
@@ -190,7 +217,7 @@ if os_type is 'sl5':
         subprocess.check_call("chroot %s mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk /boot/%s %s" % (guestos,initrd_name,kernel_version), shell=True)
 
         # Now undo the mount using /dev/loop...
-        print "Success! Unmounting the input image..."
+        print "+++ Success! Unmounting the input image..."
         for d in reversed(bind_dirs):
             subprocess.check_call("umount %s/%s" % (guestos, d),
                                   shell=True)
@@ -200,22 +227,25 @@ if os_type is 'sl5':
 
     except:
         traceback.print_exc(file=sys.stdout)
-        print "ERROR: Couldn't install generic kernel"
+        print "--- ERROR: Couldn't install generic kernel"
         sys.exit(1)
 
 
-# Mount the partitioned file system at '/'
+
+# -----------------------------------------------------------------------------
+# Mount the partitioned file system internally '/' and install EXTLINUX
+# -----------------------------------------------------------------------------
+
 try:
-    print "Mounting the new partition internally at '/'..."
+    print "+++ Mounting the new partition internally at '/'..."
     g.mount('/dev/sdb1','/')
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: Didn't work"
+    print "--- ERROR: Didn't work"
     sys.exit(1)
 
-# Install EXTLINUX bootloader
 try:
-    print "Installing EXTLINUX bootloader..."
+    print "+++ Installing EXTLINUX bootloader..."
 
     # Create modified syslinux.cfg from template
     f = open("%s/syslinux.cfg.template" % (script_path), "r")
@@ -223,15 +253,38 @@ try:
     f.close()
 
     syslinux_vars = {}
+    syslinux_vars['ROOT'] = "/dev/vda1"
 
-    if os_type is 'sl5':
+    # Don't need to do sl5 here because we got the kernel version
+    # etc. above after the yum install
+
+    if os_type is 'sl6':
+        # Look for the kernel / initrd with most recent atime in
+        # /boot.
+        kernel_versions = {}
+        for entry in g.ls('/boot'):
+            m = re.match('vmlinuz-(.+)',entry)
+            if m:
+                kernel_versions[m.group(1)] = g.stat('/boot/'+entry)['mtime']
+
+        kernel_version = max(kernel_versions.iteritems(), \
+                             key=operator.itemgetter(1))[0]
+
+        initrd_name = 'initramfs-' + kernel_version + '.img'
+
+    if os_type in ['sl5','sl6']:
         syslinux_vars['KERNEL'] = "/boot/vmlinuz-%s" % (kernel_version)
         syslinux_vars['INITRD'] = "/boot/%s" % (initrd_name)
-        syslinux_vars['ROOT'] = "/dev/vda1"
+
+    if os_type in ['ub12','ub13']:
+        syslinux_vars['KERNEL'] = "/vmlinuz"
+        syslinux_vars['INITRD'] = "/initrd.img"
 
     for key in syslinux_vars:
         syslinux_cfg = syslinux_cfg.replace("${%s}" % (key),syslinux_vars[key])
 
+    # Display syslinux.cfg and write it to the image
+    print syslinux_cfg
     g.write('/boot/syslinux.cfg',syslinux_cfg)
 
     # Now the mbr and extlinux
@@ -241,25 +294,36 @@ try:
 
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: Didn't work"
+    print "--- ERROR: Didn't work"
     sys.exit(1)
 
 # Update grub/menu.lst for Xen
 try:
-    print "Updating /boot/grub/menu.lst for Xen..."
+    print "+++ Updating /boot/grub/menu.lst for Xen..."
     menu = g.read_file('/boot/grub/menu.lst')
 
-    # nothing needed for SL5 here
+    # needed for SL6
+    menu = menu.replace('/dev/xvde', '/dev/xvde1')
+
+    # needed for Ubuntu
+    menu = menu.replace('/dev/xvda', '/dev/xvda1')
+
+    g.write('/boot/grub/menu.lst',menu)
+
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: Didn't work"
+    print "--- ERROR: Didn't work"
     sys.exit(1)
 
 
+
+# -----------------------------------------------------------------------------
 # Fix the console for SL5
+# -----------------------------------------------------------------------------
+
 if os_type is 'sl5':
     try:
-        print "Fixing the console for Scientific Linux 5..."
+        print "+++ Fixing the console for Scientific Linux 5..."
         inittab = g.read_lines('/etc/inittab')
 
         for i in range(len(inittab)):
@@ -271,20 +335,27 @@ if os_type is 'sl5':
 
     except:
         traceback.print_exc(file=sys.stdout)
-        print "ERROR: Didn't work"
+        print "--- ERROR: Didn't work"
         sys.exit(1)
 
+
+
+# -----------------------------------------------------------------------------
 # Update /etc/fstab
+# -----------------------------------------------------------------------------
+
 try:
-    print "Updating /etc/fstab..."
+    print "+++ Updating /etc/fstab..."
     fstab = g.read_lines('/etc/fstab')
     for i in range(len(fstab)):
         # Don't mount staging
         if re.search("staging",fstab[i]):
             fstab[i] = "#"+fstab[i]
-        # Update the root device to ensure LABEL=/
+
+        # Update the root device to ensure LABEL=/. Skip comment lines.
         words = fstab[i].split()
-        if words[1] is '/':
+        if (len(words) > 2) and (not re.match("\s*#",words[0])) and \
+           (words[1] is '/'):
             words[0] = 'LABEL=/'
             fstab[i] = '\t'.join(words)
 
@@ -292,12 +363,17 @@ try:
 
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: Didn't work"
+    print "--- ERROR: Didn't work"
     sys.exit(1)
 
-# /staging
+
+
+# -----------------------------------------------------------------------------
+# init script for /staging
+# -----------------------------------------------------------------------------
+
 try:
-    print "Updating rc.local to dynamically mount /staging..."
+    print "+++ Updating rc.local to dynamically mount /staging..."
 
     g.upload("%s/mount_staging" % (script_path),"/etc/init.d/mount_staging")
     g.chmod(0755,'/etc/init.d/mount_staging')
@@ -310,7 +386,7 @@ try:
 
 except:
     traceback.print_exc(file=sys.stdout)
-    print "ERROR: Didn't work"
+    print "--- ERROR: Didn't work"
     sys.exit(1)
 
 
