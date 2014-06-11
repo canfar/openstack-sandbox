@@ -88,7 +88,7 @@ try:
     g.launch()
 except:
     traceback.print_exc(file=sys.stdout)
-    print "--- ERROR: perhaps you need to run this script with root privileges?"
+    print "--- ERROR: maybe you need to run this script with root privileges?"
     sys.exit(1)
 
 # Check for extlinux and load in mbr.bin
@@ -233,7 +233,7 @@ if os_type is 'sl5':
 
 
 # -----------------------------------------------------------------------------
-# Mount the partitioned file system internally '/' and install EXTLINUX
+# Mount the partitioned file system internally at '/' and install EXTLINUX
 # -----------------------------------------------------------------------------
 
 try:
