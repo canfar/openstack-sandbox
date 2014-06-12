@@ -352,6 +352,27 @@ This interface will be slightly clumsy to users, but workable during a transitio
 * The user must ensure that the Nimbus execution requirements match the OpenStack flavor that they are requesting.
 * If we continue to use the existing CANFAR vmod service to provision VMs for batch processing, both **vmsave** (to store a copy of the image in VOSpace), and **glance image-create** (to upload the image to the OpenStack cloud(s)) will be necessary. Perhaps **vmsave** can perform both tasks?
 
+## Instantiating a ```vmsave``` snapshot with OpenStack
+
+Images made using ```vmsave``` in a CANFAR vmod session will not boot under OpenStack/KVM. The reason is that it produces a fresh image container with the **grub** bootloader, to which the filesystem contents are rsync'd. To remedy this sitution, we must do the following:
+
+1. After booting, a copy of the image that is running must be copied to ```/vmstore/vmstore-fscopy.img```
+
+2. A lock must be implemented so that **vmsave** cannot run until #1 is complete.
+
+3. **vmsave** itself requires modifications:
+   * since the migrated VMs are partitioned, the image file size will not match the mounted file system size (it will be larger to accomodate the partition and bootloader). It will fail the following test in ```imageutils.py```, and trigger the generation of a new file unless remedied. We should probably change ```!=``` to ```<``` simply to ensure that the image file is large enough:
+   ```
+   # image size does not match partition size
+   if image_stats['size'] != self.statvfs()['size']:
+       log.warning("Root partition size does not match image size.  Starting from scratch")
+       start_fresh = True
+   ```
+   * even with this previous change, it will always install the **GRUB** bootloader, overwriting **SYSLINUX**. This behaviour can be stopped by commenting-out the following lines, also in ```imageutils.py```:
+   ```
+   if self.partition and snapshot_success:
+       self.install_mbr(self.imagepath)
+   ```
 
 ## Nimbus batch processing after OpenStack vmod sessions
 
