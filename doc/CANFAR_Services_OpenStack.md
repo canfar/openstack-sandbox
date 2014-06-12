@@ -374,6 +374,9 @@ Images made using ```vmsave``` in a CANFAR vmod session will not boot under Open
        self.install_mbr(self.imagepath)
    ```
 
+In order to continue using the VMOD+vmstore mechanism to manage users VMs, one workaround is to have a local copy of the booted image on the /vmstore partition. **vmstore** will then understand as a current sync and not try to overwrite the boot loader. The **add-to-vm** vmod script could be modified to copy the VM file image from the host processing node to the VM.
+This is clearly a hack, but avoids us too much development on vmstore for only a few month transition period.
+
 ## Nimbus batch processing after OpenStack vmod sessions
 
 If we use OpenStack/KVM for vmod sessions, but continue to use Nimbus/Xen for batch processing, we will need to ensure that these images are backwards compatible.
