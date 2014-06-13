@@ -107,6 +107,11 @@ try:
     mbr_data = f.read()
     f.close()
 
+    # This length check mirrors the script that is mentioned at the
+    # URL in the comments at the start of this section. It appears to
+    # be a simple check that we have the correct file. Of course, if
+    # mbr.bin is broken we will immediately notice because VMs won't
+    # boot under KVM...
     if len(mbr_data) != 440:
         raise "%s should have a length of 440 bytes" % (mbr)
 except:
@@ -142,17 +147,25 @@ print "+++ We are working with an ^^^ %s ^^^ image" % (os_type)
 
 
 # -----------------------------------------------------------------------------
-# Create a new partitioned version of the VM.
+# Create a new partitioned version of the VM. Based on
+# http://libguestfs.org/guestfs-recipes.1.html#convert-xen-style-partitionless-image-to-partitioned-disk-image
 # -----------------------------------------------------------------------------
 
 try:
     print "+++ Initializing the partition in %s..." % (outputimage)
     g.part_init('/dev/sdb', 'mbr')
+
+    # The extra 2048 sectors at the start leaves some space for
+    # the MBR. Perhaps the 2048 sector gap at the end is not needed,
+    # but comes from the cited example code, and it works...
     g.part_add('/dev/sdb', 'p', 2048, -2048)
 
     print "+++ Copying data to the partition..."
     g.copy_device_to_device(root, '/dev/sdb1', sparse=True)
 
+    # If the input image had the label it will be propagated, but we
+    # explicitly set it again here just in case
+    g.set_e2label('/dev/sdb1','/')
 except:
     traceback.print_exc(file=sys.stdout)
     print "--- ERROR: Couldn't copy to %s. Perhaps it is too small?" % \
@@ -214,6 +227,16 @@ if os_type is 'sl5':
         os.rename("%s/boot/%s" % (guestos,initrd_name), \
                   "%s/boot/%s.backup" % (guestos,initrd_name))
 
+        # Running mkinitrd in this way comes from:
+        #   http://www.ctlai.com/?p=10
+        #
+        # When we initially install the generic kernel, there is a warning
+        # message:
+        #   WARNING: No module xenblk found for kernel [...], continuing anyway
+        #
+        # If we then run mkinitrd *without* the '--builtin=xenblk'
+        # option, it fails. By adding this line in, it continues to
+        # completion with only a warning.
         subprocess.check_call("chroot %s mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk /boot/%s %s" % (guestos,initrd_name,kernel_version), shell=True)
 
         # Now undo the mount using /dev/loop...

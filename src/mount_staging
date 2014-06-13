@@ -10,7 +10,7 @@
 #
 
 # Already Mounted?
-if grep -q /staging /etc/mtab; then
+if grep -q /staging /proc/mounts; then
     exit 0
 fi
 
