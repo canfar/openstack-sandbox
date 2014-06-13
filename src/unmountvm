@@ -1,0 +1,19 @@
+#!/bin/bash
+
+mpoint=$1
+
+echo "Unmounting /dev, /dev/pts, /proc, and /sys..."
+sudo umount $mpoint/dev/pts
+sudo umount $mpoint/dev
+sudo umount $mpoint/proc
+sudo umount $mpoint/sys
+
+echo "Now guestunmounting $mpoint..."
+sudo guestunmount $mpoint
+
+
+if [ "$?" -eq "0" ]; then
+        echo "It worked."
+else
+        echo "Something went wrong..."
+fi

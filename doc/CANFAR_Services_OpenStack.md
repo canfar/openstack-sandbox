@@ -1,6 +1,6 @@
-# CANFAR (vmod+proc) services with OpenStack
+# CANFAR VMOD and PROC equivalent services with OpenStack
 
-This document explores the implementation CANFAR vmod and proc services with OpenStack using VMs modified to run in the KVM hypervisor (https://github.com/canfar/openstack-sandbox/blob/master/CANFAR2OpenStack.md). The test environment for this work is the Cybera Rapid Access Cloud (https://github.com/canfar/openstack-sandbox#cybera-test-environment).
+This document explores the implementation CANFAR VMOD and proc services with OpenStack, using VMs from CANFAR users, modified to run in the KVM hypervisor. The migration [document](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR2OpenStack.md) might be of interest as well. The test environment for this work is the [Cybera Rapid Access Cloud](https://github.com/canfar/openstack-sandbox/blob/master/doc/initial_tests.md#cybera-test-environment).
 
 Features that are required to implement CANFAR services include:
 
@@ -14,7 +14,7 @@ Features that are required to implement CANFAR services include:
 
 ## Dynamic resource allocation
 
-CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavors**, which are specific choices for these (and other) parameters, required of the execution hardware. See http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html. The relevant parameters in OpenStack parlance are:
+CANFAR submission files can specify **memory**, **CPU cores**, and **temporary storage space**. In OpenStack, one must predefine **flavors**, which are specific choices for these (and other) parameters, required of the execution hardware. Flavors are [documented](http://docs.openstack.org/user-guide-admin/content/dashboard_manage_flavors.html). The relevant parameters in OpenStack parlance are:
 
 | Parameter            | Meaning                                                |
 |----------------------|--------------------------------------------------------|
@@ -320,7 +320,7 @@ When it comes to batch processing, if we intend to continue providing a URL to t
     * We wouldn't necessarily need to download a snapshot image from a cloud once a configuration session is finished.
     * Whenever we start a new job (either proc, or vmod), we provide a name for the image that we want to instantiate. We would have to query all of the clouds to see which one has the newest version (with that name), and transfer a copy of it to a different target cloud if needed. If the job is executed on the same cloud where this newest version exists, no transfer is needed.
     * This is sort of like VOSpace, so we would need to ensure full sets of the data on redundant subsets of the clouds to account for downtime.
-    * The HEP group at UVic is already developing something called [glint](https://github.com/canfar/openstack-sandbox/blob/master/CANFAR_user_interface.md#image-distribution-using-glint) that may provide the functionality that we need.
+    * The HEP group at UVic is already developing something called [glint](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_user_interface.md#image-distribution-using-glint) that may provide the functionality that we need.
 
 ## VM time limits
 
@@ -337,16 +337,45 @@ For cloud to cloud communication, one floating IP for each cloud is necessary. B
 
 Cloud Scheduler already has the ability to execute proc jobs using either Nimbus or OpenStack clouds; a feature that is already used in production by the HEP group at UVic.
 
-The modifications to Cloud Scheduler provide a very basic interface. Job submission files must contain both the **Nimbus requirements**: cores, memory, staging space and VM URL (e.g., to VOSpace); and the **OpenStack equivalents**: a flavor, and the name of the VM image (which must have been uploaded previously to the cloud using glance).
+The modifications to Cloud Scheduler provide a very basic interface to condor. For jobs to run on an OpenStack cloud, it will need:
+```
++VMLoc = "http://canfar/myimage"
++VMAMI = "synnefo_openstack:ami-0000001, cybera:ami-0200021 "
++VMInstanceType = "synnefo:m1.xlarge"
+```
+The AMI number is necessary right now, but by the time we end up using the OpenStack cloud, the native API of Cloud Scheduler to OpenStack will allow us to refer VM with names.
+Job submission files that will run on both Nimbus clouds and OpenStack clouds, must contain both the **Nimbus requirements**: cores, memory, staging space and VM URL (e.g., to VOSpace); and the **OpenStack requirements** above.
 
 This interface will be slightly clumsy to users, but workable during a transition period. However, the following issues must be considered:
 
 * The VMs must have undergone the dual-boot (Xen/KVM) conversion)
-
 * The user must ensure that the Nimbus execution requirements match the OpenStack flavor that they are requesting.
-
 * If we continue to use the existing CANFAR vmod service to provision VMs for batch processing, both **vmsave** (to store a copy of the image in VOSpace), and **glance image-create** (to upload the image to the OpenStack cloud(s)) will be necessary. Perhaps **vmsave** can perform both tasks?
 
+## Instantiating a ```vmsave``` snapshot with OpenStack
+
+Images made using ```vmsave``` in a CANFAR vmod session will not boot under OpenStack/KVM. The reason is that it produces a fresh image container with the **grub** bootloader, to which the filesystem contents are rsync'd. To remedy this sitution, we must do the following:
+
+1. After booting, a copy of the image that is running must be copied to ```/vmstore/vmstore-fscopy.img```
+
+2. A lock must be implemented so that **vmsave** cannot run until #1 is complete.
+
+3. **vmsave** itself requires modifications:
+   * since the migrated VMs are partitioned, the image file size will not match the mounted file system size (it will be larger to accomodate the partition and bootloader). It will fail the following test in ```imageutils.py```, and trigger the generation of a new file unless remedied. We should probably change ```!=``` to ```<``` simply to ensure that the image file is large enough:
+   ```
+   # image size does not match partition size
+   if image_stats['size'] != self.statvfs()['size']:
+       log.warning("Root partition size does not match image size.  Starting from scratch")
+       start_fresh = True
+   ```
+   * even with this previous change, it will always install the **GRUB** bootloader, overwriting **SYSLINUX**. This behaviour can be stopped by commenting-out the following lines, also in ```imageutils.py```:
+   ```
+   if self.partition and snapshot_success:
+       self.install_mbr(self.imagepath)
+   ```
+
+In order to continue using the VMOD+vmstore mechanism to manage users VMs, one workaround is to have a local copy of the booted image on the /vmstore partition. **vmstore** will then understand as a current sync and not try to overwrite the boot loader. The **add-to-vm** vmod script could be modified to copy the VM file image from the host processing node to the VM.
+This is clearly a hack, but avoids us too much development on vmstore for only a few month transition period.
 
 ## Nimbus batch processing after OpenStack vmod sessions
 
@@ -360,13 +389,14 @@ The most basic usage scenario is maintenance of an existing CANFAR VM that has a
 
 2. Using the native OpenStack **snapshot** method (either through the dashboard, or executing a **nova** command outside the running VM), and then downloading the resulting image using **glance**. The image type is **qcow2** in this case.
 
-* **Nimbus may be able to execute an image stored in qcow2 format** although with a number of caveats (http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2):
-  1. install qemu-nbd on execution hosts
+* **Nimbus may be able to execute an image stored in qcow2 format** (as reference [here](http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2)) although with a number of modifications:
+  1. install qemu-nbd, qemu, qemu-img on execution hosts
   2. set qcow2 support to true (http://www.nimbusproject.org/docs/current/admin/reference.html#qcow2-config)
-  3. **KVM** is a prerequisite
-  4. **nimbus >= 1.2** is a prerequisite (versions at UVic and Breezy are not new enough)
-
-  None of this has been successfully tested yet.
+  3. **KVM** is a prerequisite, so the SL5 kernel on all processing nodes has to be switched to Xen support
+  4. **nimbus >= 2.10** is a prerequisite (versions at UVic and Breezy are not new enough)
+  5. modify Nimbus to support qemu < 1 call API (in src/python/workspacecontrol/defaults/ImageEditing.py)
+  6. modify etc/workspace-controls/{networks,libvirt}.conf and change kvm/qemu instead of xen
+Some early tests showed we were able to boot a VM like that, but unsuccessful
 
 * **qcow2 images can be converted back to raw:**
   * ```qemu-img convert -f qcow2 -O raw vm_12.04_staging_snapshot.qcow2 vm_12.04_staging_snapshot.img``` - **very fast**, sparse image file.

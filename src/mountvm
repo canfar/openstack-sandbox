@@ -1,0 +1,26 @@
+#!/bin/bash
+
+image=$1
+mpoint=$2
+
+
+sudo guestmount -i -a $image $mpoint
+
+if [ "$?" -ne "0" ]; then
+        exit 1
+fi
+
+echo "Copying resolve.conf..."
+sudo cp /etc/resolv.conf $mpoint/etc/
+
+echo "Mounting /dev, /dev/pts, /proc, and /sys... "
+sudo mount --bind /dev $mpoint/dev
+sudo mount --bind /dev/pts $mpoint/dev/pts
+sudo mount --bind /proc $mpoint/proc
+sudo mount --bind /sys $mpoint/sys
+
+if [ "$?" -eq "0" ]; then
+        echo "Ready to go! You might want to: sudo -i; cd $mpoint; chroot $mpoint"
+else
+        echo "Something went wrong..."
+fi
