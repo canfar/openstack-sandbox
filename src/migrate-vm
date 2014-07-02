@@ -175,42 +175,50 @@ except:
 
 
 # -----------------------------------------------------------------------------
-# Install generic kernel if SL5
+# Mount the image to install additional software
 # -----------------------------------------------------------------------------
+try:
+    if not os.path.exists(guestos):
+        print "+++ Creating %s to guest mount the image" % (guestos)
+        os.makedirs(guestos)
+    else:
+        print "+++ %s already exists for guest mounting the image" % \
+            (guestos)
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "--- ERROR: Unable to use directory %s" % (guestos)
+    sys.exit(1)
 
-# We need to install the regular, non-xen kernel which will be used by
-# KVM (and get its boot parameters from syslinux.cfg). When booting
-# under xen, PyGrub will still pick up the old settings in
-# /boot/grub/menu.lst.
 
-if os_type is 'sl5':
-    try:
+# Mount the image using the loop device and device map
+# http://manual.futuregrid.org/nimbus.html
+try:
+    print "+++ Mounting image in the local filesystem at %s ..." % \
+        (guestos)
+
+    subprocess.check_call("kpartx -av %s" % (outputimage), shell=True)
+    subprocess.check_call("mount /dev/mapper/loop0p1 %s" % (guestos),
+                          shell=True)
+    shutil.copy("/etc/resolv.conf","%s/etc/" % (guestos))
+    bind_dirs = ['/dev','/dev/pts','/proc','/sys']
+    for d in bind_dirs:
+        subprocess.check_call("mount --bind %s %s/%s" % (d, guestos, d),
+                              shell=True)
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "--- ERROR: Unable to mount the image"
+    sys.exit(1)
+
+
+try:
+    if os_type is 'sl5':
+        # We need to install the regular, non-xen kernel which will be
+        # used by KVM (and get its boot parameters from
+        # syslinux.cfg). When booting under xen, PyGrub will still
+        # pick up the old settings in /boot/grub/menu.lst.
         print "+++ For Scientific Linux 5 we need to install a generic kernel"
 
-        if not os.path.exists(guestos):
-            print "+++ Creating %s to guest mount the image" % (guestos)
-            os.makedirs(guestos)
-        else:
-            print "+++ %s already exists for guest mounting the image" % \
-                (guestos)
-
-        # Mount the image using loop. See:
-        # http://manual.futuregrid.org/nimbus.html
-        print "+++ Mounting image in the local filesystem at %s ..." % \
-            (guestos)
-
-        subprocess.check_call("losetup /dev/loop0 %s" % (outputimage),
-                              shell=True)
-        subprocess.check_call("kpartx -a /dev/loop0", shell=True)
-        subprocess.check_call("mount /dev/mapper/loop0p1 %s" % (guestos),
-                              shell=True)
-        shutil.copy("/etc/resolv.conf","%s/etc/" % (guestos))
-        bind_dirs = ['/dev','/dev/pts','/proc','/sys']
-        for d in bind_dirs:
-            subprocess.check_call("mount --bind %s %s/%s" % (d, guestos, d),
-                                  shell=True)
-
-        # Now install the kernel using chroot, and obtain the version number
+        # Install the kernel using chroot, and obtain the version number
         # from the yum log so that we can run mkinitrd
         subprocess.check_call("chroot %s yum -y install kernel" % (guestos), \
                               shell=True)
@@ -239,19 +247,19 @@ if os_type is 'sl5':
         # completion with only a warning.
         subprocess.check_call("chroot %s mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk /boot/%s %s" % (guestos,initrd_name,kernel_version), shell=True)
 
-        # Now undo the mount using /dev/loop...
-        print "+++ Success! Unmounting the input image..."
-        for d in reversed(bind_dirs):
-            subprocess.check_call("umount %s/%s" % (guestos, d),
-                                  shell=True)
-        subprocess.check_call("umount %s" % (guestos), shell=True)
-        subprocess.check_call("kpartx -d /dev/loop0", shell=True)
-        subprocess.check_call("losetup -d /dev/loop0", shell=True)
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "--- ERROR: Couldn't install software on mounted image"
+    sys.exit(1)
 
-    except:
-        traceback.print_exc(file=sys.stdout)
-        print "--- ERROR: Couldn't install generic kernel"
-        sys.exit(1)
+finally:
+    # Now unmount the device and delete the device mapping
+    print "+++ Unmounting the image..."
+    for d in reversed(bind_dirs):
+        subprocess.check_call("umount %s/%s" % (guestos, d),
+                              shell=True)
+    subprocess.check_call("umount %s" % (guestos), shell=True)
+    subprocess.check_call("kpartx -d %s" % (outputimage), shell=True)
 
 
 
