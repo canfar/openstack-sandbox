@@ -268,10 +268,6 @@ try:
     #
     # Note that it does not work for SL5, but a working versions seems
     # to be on those VMs already.
-
-
-    # This doesn't work on SL5, but a new enough version will already
-    # be there.
     if os_type is not 'sl5':
         print "+++ Upgrade python setuptools"
         subprocess.check_call("chroot %s pip install --upgrade setuptools" \
