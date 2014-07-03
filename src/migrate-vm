@@ -260,6 +260,16 @@ try:
     shutil.copy("%s" % (vmstore), "%s/tmp/" % (guestos))
 
 
+    # easy_install and pip were both failing to install vmstore on
+    # some of the VMs. Following this web page, updating setuptools
+    # fixes the problem:
+    #
+    # http://stackoverflow.com/questions/11425106/python-pip-install-fails-invalid-command-egg-info
+    #
+    # Note that it does not work for SL5, but a working versions seems
+    # to be on those VMs already.
+
+
     # This doesn't work on SL5, but a new enough version will already
     # be there.
     if os_type is not 'sl5':
