@@ -26,12 +26,14 @@ valid_os_type = { "sl5" : "Scientific Linux release 5",
 try:
     # parse command line
     parser = argparse.ArgumentParser(description='Migrate old Xen-style CANFAR VMs for compatibility with OpenStack/KVM')
-    parser.add_argument('--inputimage', required=True, help='Input VM image')
-    parser.add_argument('--outputimage', required=True,
-                        help='Converted output VM image')
+    parser.add_argument('--inputimage', required=True, \
+                        help='Input VM image file')
+    parser.add_argument('--outputvmtype', required=True,
+                        help='Converted output VM image name (no suffix)')
     args = parser.parse_args()
     inputimage=args.inputimage
-    outputimage=args.outputimage
+    outputvmtype=args.outputvmtype
+    outputimage=outputvmtype+'.img'
 
     # Get the location of the script so that we can find the templates
     script_path = os.path.dirname(os.path.realpath(__file__))
@@ -434,6 +436,37 @@ try:
             fstab[i] = '\t'.join(words)
 
     g.write('/etc/fstab',"\n".join(fstab))
+
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "--- ERROR: Didn't work"
+    sys.exit(1)
+
+
+
+# -----------------------------------------------------------------------------
+# Update image metadata
+# -----------------------------------------------------------------------------
+
+try:
+    metadatafile = "/.image.metadata"
+    print "+++ Updating %s" % metadatafile
+    metadata = g.read_file(metadatafile)
+    metadata = re.sub(r'"name"\s*:\s*"[^"]+"', \
+                      r'"name": "%s.img.gz"' \
+                      % outputvmtype, metadata)
+    metadata = re.sub(r'"vmtype"\s*:\s*"[^"]+"', \
+                      r'"vmtype": "%s"' \
+                      % outputvmtype, metadata)
+    print metadata
+    g.write(metadatafile,metadata)
+
+    condorfile = "/etc/condor/condor_config.local"
+    print "+++ Updating %s" % condorfile
+    condordata = g.read_file(condorfile)
+    condordata = re.sub(r'VMType\s*=\s*"[^"]+"', \
+                        r'VMType= "%s"' % outputvmtype, condordata)
+    g.write(condorfile,condordata)
 
 except:
     traceback.print_exc(file=sys.stdout)
