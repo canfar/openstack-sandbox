@@ -23,7 +23,7 @@ It may be a good idea for the executed script to set ```$HOME``` to ```$TMPDIR``
 
 
 
-## Injecting proxy certificate: brute-force ```transfer_input_files``` method
+## Inject certificate: ```transfer_input_files``` method
 
 One simple method for injecting a user's proxy certificate into a batch VM executing as **nobody** is to use the ```transfer_input_files``` [option](http://research.cs.wisc.edu/htcondor/manual/v7.6/2_5Submitting_Job.html#SECTION00354400000000000000) in the submission file, as in the following example:
 ```
