@@ -44,3 +44,27 @@ mv cadcproxy.pem $HOME/.ssl/
 ```
 
 Alternatively, one might leave the certificate in ```$TMPDIR``` and simple specify its location explicitly as needs, e.g., ```vcp --certfile=$TMPDIR/cadcproxy.pem```. For jobs that use **curl** this scenario might be more complicated.
+
+
+## Inject certificate: ```x509userproxy``` method
+
+Condor has a built-in method for handling user proxy certificates. Similar to the previous method, the name of the proxy is supplied in the submission file:
+```
+x509userproxy = .ssl/cadcproxy.pem
+```
+
+However, byt itself this method will not work, and a submitted job fails immediately in the following way:
+```
+Submitting job(s)
+ERROR: 
+GSS Major Status: General failure
+GSS Minor Status Error Chain:
+globus_gsi_gssapi: Unable to read credential for import
+globus_gsi_gssapi: Error with gss credential handle
+globus_gsi_gssapi: Error with GSI credential
+globus_sysconfig: Could not find a valid trusted CA certificates directory: The trusted certificates directory could not be found in any of the following locations: 
+1) env. var. X509_CERT_DIR
+2) $HOME/.globus/certificates
+3) /etc/grid-security/certificates
+4) $GLOBUS_LOCATION/share/certificates
+```
