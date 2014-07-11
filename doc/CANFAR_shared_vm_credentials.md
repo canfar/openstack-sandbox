@@ -84,5 +84,6 @@ To summarize:
    * a long-lived VM will only execute jobs by the user that instantiated it (a security feature: you don't want multiple users on that VM running as "nobody" able to see/use eachother's proxy certificates to impersonate them)
    * it conforms to Condor's built-in credential injection mechanism
    * it is the system used by UVic
+   * there may be some [issues related to incompatibility between different versions of openssl](https://wiki.heprc.uvic.ca/twiki/bin/view/Main/CsGsiSupport#A_note_about_CA_root_cert_hash_v)
 
 Since the first method has already been demonstrated to work (as a fall back), there is probably some merit in using our development system to test the GSI technique. Another reason for considering this now, rather than later, is that we already need to modify the user VMs for compatibility with OpenStack, so this might be a good time to update their configuration to support GSI as well.
