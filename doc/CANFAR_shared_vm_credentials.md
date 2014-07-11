@@ -77,10 +77,11 @@ To summarize:
 1. The first method is extremely simple:
    * no modifications to Condor or Cloud Scheduler required
    * only need to supply documentation to users
-   * However it continues to rely on our "weak" authentication mechanism that merely restricts job submission to accounts on the login host.
+   * However, it continues to rely on our "weak" authentication mechanism that merely restricts job submission to accounts on the login host.
 
 2. The second GSI method is more complicated, and requires updates to the Condor central manager as well as the execution hosts and user VMs. However:
    * it provides a more secure method for users to communicate with their VMs
+   * a long-lived VM will only execute jobs by the user that instantiated it (a security feature: you don't want multiple users on that VM running as "nobody" able to see/use eachother's proxy certificates to impersonate them)
    * it conforms to Condor's built-in credential injection mechanism
    * it is the system used by UVic
 
