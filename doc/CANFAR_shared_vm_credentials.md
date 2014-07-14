@@ -63,7 +63,8 @@ In the present CANFAR system, a much simpler method is used in which the ability
 
 ### Setting up GSI infrastructure
 
-This [document](https://wiki.heprc.uvic.ca/twiki/bin/view/Main/CsGsiSupport) from Cloud Scheduler describes the procedure for setting things up. It is also worth reading the [GSI](http://research.cs.wisc.edu/htcondor/manual/v7.8/3_6Security.html#SECTION00463100000000000000) section in the Condor documentation.
+This [document](https://wiki.heprc.uvic.ca/twiki/bin/view/Main/CsGsiSupport) from Cloud Scheduler describes the procedure for setting things up. It is also worth reading the [GSI](http://research.cs.wisc.edu/htcondor/manual/v7.8/3_6Security.html#SECTION00463100000000000000) section in the Condor documentation. Finally, this [presentation](http://www.google.ca/url?sa=t&rct=j&q=&esrc=s&source=web&cd=3&ved=0CCwQFjAC&url=http%3A%2F%2Fresearch.cs.wisc.edu%2Fhtcondor%2FCondorWeek2011%2Fpresentations%2Fzmiller-ssl-tutorial.pdf&ei=5yvEU-qmLMaayAT-4IK4Dg&usg=AFQjCNHHRHtMpQJiTUYfRnMXk2sKg5FGOA&sig2=1KFnMeXXn1FWowB9-Ct2qw&bvm=bv.70810081,d.aWw&cad=rja) has a lot of information.
+
 
 To summarize:
 
