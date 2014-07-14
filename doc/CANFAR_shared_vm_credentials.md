@@ -2,7 +2,7 @@
 
 There is presently no good system in place for the following scenario: someone creates a VM that they wish to share with collaborators. Collaborators execute batch jobs with this VM, but supply their own CADC credentials so that their (potentially proprietary) data may be accessed at run time, and results can be stored back into their VOSpace with group privileges.
 
-Throughout this document we assume (HT)Condor 7.8.8 which is the version used by CANFAR at the time of writing.
+Throughout this document we assume [(HT)Condor 7.8.8](http://research.cs.wisc.edu/htcondor/manual/v7.8/ref.html) which is the version used by CANFAR at the time of writing.
 
 
 ## Submitting jobs as **nobody**
