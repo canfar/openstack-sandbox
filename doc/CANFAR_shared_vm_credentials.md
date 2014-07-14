@@ -1,11 +1,11 @@
 # CANFAR batch processing using shared VMs
 
-There is presently no good system in place for the following scenario: someone creates a VM that they wish to share with collaborators. Collaborators execute batch jobs with this VM, but supply their own CADC credentials so that their (potentially proprietary) data may be accessed at run time, and results can be stored back into their VOSpace with group privileges.
+There is presently no good system in place for the following scenario: someone creates a VM that they wish to share with collaborators. Collaborators execute batch jobs with this VM, but supply their own CADC credentials so that their (potentially proprietary) data may be accessed at run time, and results can be stored back into their VOSpace with group privileges. Related to this is the desire to move away from maintaining individual accounts on the CANFAR login/submission host for all users. Instead, we wish to explore the possibility of a web service handling job submission using a single account on the Condor submission host on behalf of the users.
 
 Throughout this document we assume [(HT)Condor 7.8.8](http://research.cs.wisc.edu/htcondor/manual/v7.8/ref.html) which is the version used by CANFAR at the time of writing.
 
 
-## Submitting jobs as **nobody**
+## Executing jobs as **nobody**
 
 In the CANFAR submission file there is a Condor option that is normally set
 ```
@@ -88,3 +88,10 @@ To summarize:
    * there may be some [issues related to incompatibility between different versions of openssl](https://wiki.heprc.uvic.ca/twiki/bin/view/Main/CsGsiSupport#A_note_about_CA_root_cert_hash_v)
 
 Since the first method has already been demonstrated to work (as a fall back), there is probably some merit in using our development system to test the GSI technique. Another reason for considering this now, rather than later, is that we already need to modify the user VMs for compatibility with OpenStack, so this might be a good time to update their configuration to support GSI as well.
+
+
+## Submitting jobs from a single account for all users
+
+Presently a user submits a job by ssh'ing to the login/submission host using their personal account, and typing ```condir_submit <submission file>```. If we wish to move to a model whereby submission is handled by a web service, that service will perform the actual submission using a single, generic user account.
+
+It appears that GSI can again help us in this instance. Once a user authenticates itself to this hypothetical web service, it will be able to obtain the user's proxy certificate behind the scenes, and supply it to ```condor_submit``` via the submission file. A Condor [Unified Map File](http://research.cs.wisc.edu/htcondor/manual/v7.6/3_6Security.html#SECTION00464000000000000000) may be used to map the X.509 distinguished name in the certificate to a Condor user name. In other words, access to batch submission resources would be controlled by updating this map file, rather than maintaining user accounts.
