@@ -262,9 +262,9 @@ The following basic steps were used to configure canfardev (development Condor s
 
       ```
       The ```SEC_DEFAULT*``` turn on/require GSI/cert authentication, both for users and hosts.
-
       ```CERTIFICATE_MAPFILE``` maps distinguished names in certificates to canonical Condor users. An example is the following:
-      ```GSI "O=Grid/OU=GlobusTest/OU=simpleCA-bifrostdev.cadc.dao.nrc.ca/OU=local/CN=Ed Chapin" echapin
+      ```
+      GSI "O=Grid/OU=GlobusTest/OU=simpleCA-bifrostdev.cadc.dao.nrc.ca/OU=local/CN=Ed Chapin" echapin
          GSI CN=echapin_716 echapin
          GSI CN=canfradm canfradm
       ```
@@ -272,7 +272,9 @@ The following basic steps were used to configure canfardev (development Condor s
 
       Note that this file is an alternative to the more restrictive Globus ```GRIDMAP``` files. Initial tests failed when using this method.
     * Mappings for subjects of host certificates are probably also required. In earlier tests, grid mapfiles, e.g., ```/etc/condor/grid-mapfile.condor``` had entries like this:
-      ```"/O=Auto/OU=CADCDevCA/CN=john.ouellette@nrc-cnrc.gc.ca" not_a_real_account
+      
+      ```
+         "/O=Auto/OU=CADCDevCA/CN=john.ouellette@nrc-cnrc.gc.ca" not_a_real_account
          "/C=CA/O=Grid/OU=nrc-cnrc.gc.ca/CN=Sharon Goliath" goliaths
          "/C=CA/O=Grid/OU=nrc-cnrc.gc.ca/CN=Sharon Goliath" jjk
          "/O=Grid/CN=host/canfardev.cadc.dao.nrc.ca" condor
