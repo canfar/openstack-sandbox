@@ -205,15 +205,18 @@ The following basic steps were used to configure canfardev (development Condor s
       Repeat for other machines as needed.
     * User certificates from this CA can also be requested using ```$ grid-cert-request``` and then signed in the same manner as the host certificates on the CA machine. The signed user cert should then be copied into ```$HOME/.globus/usercert.pem``` on the machines where the user needs them (also remember to install that CA rpm to indicate that the CA is a trusted authority!)
 3. **Add the CANFAR CA**
-
     * Add the certificate authority for CANFAR user proxy certificates to canfardev and bifrostdev. The following should be added to ```/etc/grid-security/certificates```:
+      
       ```
       -rw-r--r-- 1 root root  875 Jul 17 13:45 ca.crt
       lrwxrwxrwx 1 root root    6 Jul 17 13:45 1b6c4ffc.0 -> ca.crt
       -rw-r--r-- 1 root root 1258 Jul 17 13:46 1b6c4ffc.signing_policy
       ```
+
       where ```1b6c4ffc.signing_policy``` looks something like this:
-      ```# ca-signing-policy.conf, see ca-signing-policy.doc for more information
+
+      ```
+         # ca-signing-policy.conf, see ca-signing-policy.doc for more information
          #
          # This is the configuration file describing the policy for what CAs are
          # allowed to sign whoses certificates.
