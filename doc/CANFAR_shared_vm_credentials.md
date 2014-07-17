@@ -69,19 +69,18 @@ This [document](https://wiki.heprc.uvic.ca/twiki/bin/view/Main/CsGsiSupport) fro
 The following basic steps were used to configure canfardev (development Condor submission node), and bifrostdev (development Condor central manager) so that jobs can be submitted to the queue.
 
 1. **Install Globus Toolkit / Certificate Authority (CA)**
-
     A certificate authority (CA) will be used to sign certificates to authenticate communications between the various machines involved (submit, central manager, processing). It can also be used to make user certificates, although we can also use CANFAR user proxy certificates.
-
     * Set up the Globus installer repo (an equivalent exists for Debian/Ubuntu... see [Globus docs](http://toolkit.globus.org/toolkit/docs/5.2/5.2.0/admin/install/#q-toolkit)):
+      
       ```$ sudo rpm -hUv http://www.globus.org/ftppub/gt5/5.2/5.2.5/installers/repo/Globus-5.2.stable-config.sl-5.5-1.noarch.rpm```
-
     * Install Globus components required to set up the CA
+      
       ```$ sudo yum install globus-simple-ca globus-gsi-cert-utils-progs```
-      Executables will be in ```/usr/bin```, and other stuff is also installed to ```/usr/share/globus*```, ```/etc/grid-security```, and ```/usr/sbin/grid*```
-
+      
+      Executables will be in ```/usr/bin```, and other stuff is also installed to ```/usr/share/globus*```, ```/etc/grid-security```, and ```/usr/sbin/grid```.
     * Set up our Globus Simple CA. Fill in things like the name of the CA, choose an email for the person who is responsible, and choose a passphrase (important to remember).
-
-      ```$ grid-ca-create -dir $HOME/globus
+      ```
+      $ grid-ca-create -dir $HOME/globus
 
 
           C e r t i f i c a t e    A u t h o r i t y    S e t u p
@@ -121,20 +120,20 @@ The following basic steps were used to configure canfardev (development Condor s
       done
               globus_simple_ca_f3d4caab.tar.gz
       ```
-
     * Create an RPM that will be used to install information about this CA on machines that will use its certificates (this is probably the same information that is in the tarball from the previous step):
+      
       ```$ grid-ca-package -r -cadir $HOME/globus```
+      
       which produces a file with a name like ```globus-simple-ca-f3d4caab-1.0-1.noarch.rpm```.
-
     * Install the CA package from the previous step on condordev and canfardev:
-
+      
       ```$ sudo rpm -i globus-simple-ca-f3d4caab-1.0-1.noarch.rpm```
-
+      
       This step places files in /etc/grid-security and is equivalent to saying "certificates signed by the Certificate Authority that we created in the previous step are to be trusted".
-
       Check to see if the new certificate authority is listed as the default:
-
-      ```$ sudo /usr/sbin/grid-default-ca -list
+      
+      ```
+         $ sudo /usr/sbin/grid-default-ca -list
          The available CA configurations installed on this host are:
 
          Directory: /etc/grid-security/certificates
@@ -149,15 +148,12 @@ The following basic steps were used to configure canfardev (development Condor s
          The default CA is: /O=Grid/OU=GlobusTest/OU=simpleCA-bifrostdev.cadc.dao.nrc.ca/CN=Globus Simple CA
                   Location: /etc/grid-security/certificates/f3d4caab.0
       ```
-
       Edit ```/etc/grid-security/certificates/f3d4caab.signing_policy``` to change the ```cond_subjects``` line:
       ```cond_subjects     globus       '"/O=Grid/*"'```
-
 2. **Request certificates**
-
     * Host certificates are required for the machines used by condor (canfardev and bifrostdev in this case). For example, on bifrostdev:
-
-    ```$ sudo grid-cert-request -force -host bifrostdev.cadc.dao.nrc.ca
+      ```
+       $ sudo grid-cert-request -force -host bifrostdev.cadc.dao.nrc.ca
 
            /etc/grid-security/hostcert_request.pem already exists
            /etc/grid-security/hostcert.pem already exists
@@ -197,19 +193,17 @@ The following basic steps were used to configure canfardev (development Condor s
        Your certificate will be mailed to you within two working days.
        If you receive no response, contact Globus Simple CA at ed.chapin@nrc-cnrc.gc.ca
       ```
-
       Then, back on the machine where we set up the CA, sign the request. Copy ```hostcert_request.pem``` over, and execute
 
       ```$ grid-ca-sign /etc/grid-security/hostcert_request.pem -out hostsigned.pem```
 
       where it will request the passphrase that you selected when setting up the CA. Then copy the output ```hostsigned.pem``` to ```/etc/grid-security/hostcert.pem``` on bifrostdev. It is probably also a good idea to:
-      ```$ sudo chown root:root hostcert.pem```
-      ```$ sudo chmod 644 hostcert.pem```
-
+      ```
+      $ sudo chown root:root hostcert.pem```
+      $ sudo chmod 644 hostcert.pem
+      ```
       Repeat for other machines as needed.
-
     * User certificates from this CA can also be requested using ```$ grid-cert-request``` and then signed in the same manner as the host certificates on the CA machine. The signed user cert should then be copied into ```$HOME/.globus/usercert.pem``` on the machines where the user needs them (also remember to install that CA rpm to indicate that the CA is a trusted authority!)
-
 3. **Add the CANFAR CA**
 
     * Add the certificate authority for CANFAR user proxy certificates to canfardev and bifrostdev. The following should be added to ```/etc/grid-security/certificates```:
@@ -253,10 +247,9 @@ The following basic steps were used to configure canfardev (development Condor s
 
          # end of EACL
          ```
-
 4. **Configure Condor to use certificate-based authentication**
-
     * Edit ```/etc/condor/condor_config.local``` on condordev and bifrostdev to add the following lines:
+      
       ```
       # GSI - set up to be the same as the nimbus locations
       #
@@ -278,7 +271,6 @@ The following basic steps were used to configure canfardev (development Condor s
       Here the first line has the full subject for a user cert that was generated using our Globus Simple CA, and it maps to a user called ```echapin```. The next line simply checks the subject for a Common Name (CN) ```echapin_716```, which corresponds to a CANFAR user proxy certificate, and also maps to a user ```echapin```. The last line is another Globus Simple CA signed certificate for a subject with ```CN=canfradm``` and maps to the user ```canfradm```. Other authentication methods are also handled by these "unified mapfiles", and regex's etc. may be used. See the [documentation](http://research.cs.wisc.edu/htcondor/manual/v7.8/3_6Security.html#SECTION00464000000000000000).
 
       Note that this file is an alternative to the more restrictive Globus ```GRIDMAP``` files. Initial tests failed when using this method.
-
     * Mappings for subjects of host certificates are probably also required. In earlier tests, grid mapfiles, e.g., ```/etc/condor/grid-mapfile.condor``` had entries like this:
       ```"/O=Auto/OU=CADCDevCA/CN=john.ouellette@nrc-cnrc.gc.ca" not_a_real_account
          "/C=CA/O=Grid/OU=nrc-cnrc.gc.ca/CN=Sharon Goliath" goliaths
