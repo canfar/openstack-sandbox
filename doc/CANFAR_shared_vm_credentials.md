@@ -249,8 +249,9 @@ The following basic steps were used to configure canfardev (development Condor s
          cond_subjects     globus       '"/C=ca/O=hia/OU=cadc/*"'
 
          # end of EACL
-         ```
+      ```
 4. **Configure Condor to use certificate-based authentication**
+
     * Edit ```/etc/condor/condor_config.local``` on condordev and bifrostdev to add the following lines:
       
       ```
