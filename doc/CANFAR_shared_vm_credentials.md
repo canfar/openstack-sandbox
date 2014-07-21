@@ -1,4 +1,4 @@
-# CANFAR batch processing using shared VMs
+# CANFAR batch processing: credential injection and shared VMs
 
 There is presently no good system in place for the following scenario: someone creates a VM that they wish to share with collaborators. Collaborators execute batch jobs with this VM, but supply their own CADC credentials so that their (potentially proprietary) data may be accessed at run time, and results can be stored back into their VOSpace with group privileges. Related to this is the desire to move away from maintaining individual accounts on the CANFAR login/submission host for all users. Instead, we wish to explore the possibility of a web service handling job submission using a single account on the Condor submission host on behalf of the users.
 
@@ -345,3 +345,65 @@ canfradm(canfardev)$ condor_q
 ```
 
 Another Condor configuration variable can be used give authorization to *all* users to modify jobs on behalf of eachother. We are not using it here, but it is called ```QUEUE_ALL_USERS_TRUSTED```.
+
+## data web service and certificates
+
+Many users presently store their username and password in a .netrc file in order to obtain files from the data web service. It is generally not a good idea to store this information on the VMs, especially if they are to be shared. The injected proxy certificates can be used with some versions of **curl**. For example,
+
+```
+$ curl -v -E ~/.ssl/cadcproxy.pem --location-trusted https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/JCMT/s8a20140517_00041_0008?runid=dtwbme1p06kygpf0 -o s8a20140517_00041_0008.sdf
+
+```
+will obtain these proprietary data (if the user has the correct access privileges). However, not all versions of curl support this syntax. For Scientific Linux 5, Ubuntu 12.04, and Ubuntu 13.10, curl is built using OpenSSL and it works as above. However, Scientific Linux 6 uses NSS, and the following error occurs:
+
+```
+$ curl -v -E ~/.ssl/cadcproxy.pem --location-trusted https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/JCMT/s8a20140517_00041_0008?runid=dtwbme1p06kygpf0 -o s8a20140517_00041_0008.sdf
+* About to connect() to www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca port 443 (#0)
+*   Trying 132.246.217.5... connected
+* Connected to www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca (132.246.217.5) port 443 (#0)
+* Initializing NSS with certpath: sql:/etc/pki/nssdb
+*   CAfile: /etc/pki/tls/certs/ca-bundle.crt
+  CApath: none
+* NSS: client certificate from file
+*       subject: CN=1435463209,CN=echapin_716,OU=cadc,O=hia,C=ca
+*       start date: Jul 21 18:41:50 2014 GMT
+*       expire date: Jul 31 18:46:50 2014 GMT
+*       common name: 1435463209
+*       issuer: CN=echapin_716,OU=cadc,O=hia,C=ca
+* NSS error -12195
+* Closing connection #0
+* SSL connect error
+```
+
+Where ```NSS error -12195``` translates to  ```SSL_ERROR_UNKNOWN_CA_ALERT: Peer does not recognize and trust the CA that issued your certificate.```.
+
+After some experimentation by PD, it seems that NSS is checking the validity of the cert locally rather than leaving that to the server. A work-around that can handle grid Canada certificates on a Fedora Core 16 system bundles the system CA bundle with the missing Grid Canada CA and the user certificate itself:
+
+```
+#!/bin/bash
+
+MYCERT=$1
+if [ -z "$MYCERT" ]; then
+	echo "usage: makeCertBundle.sh <certficate file>"
+	exit 1
+fi
+
+SYSTEM_BUNDLE=/etc/pki/tls/certs/ca-bundle.crt 
+GRIDCA=/etc/pki/tls/certs/GridCanada.crt
+
+MYBUNDLE=$HOME/.ssl/myBundle.crt
+
+cat $SYSTEM_BUNDLE $GRIDCA $MYCERT > $MYBUNDLE
+
+echo "created $MYBUNDLE"
+echo 
+echo "usage: curl --cacert $MYBUNDLE --cert ..."
+echo
+```
+
+As indicated in the final comment, this bundle may then be supplied to curl along with the user certificate to get it to work. This trick will probably also work with CADC issued proxy certificates. This kind of behaviour is also described in [this useful page that tests various versions of curl](https://wiki.nikhef.nl/grid/Funny_Curly_things).
+
+Going forward, it will be necessary to provide a scriptable method of interacting with the data web service using injected certificates. Some possible solutions include:
+1. Describing to the users how to create a CA bundle and execute successful curl commands as above.
+2. Try to submit upstream patches to NSS to obtain the desired behaviour with curl.
+3. Write a script that can easily be deployed on VMs to access the data web service. Note that there is already an **adPut** script in ```wservice/data_ws/scripts``` and ```wservice/transfer_ws/script``` that currently depends on this broken curl functionality. Some archives may also have this problem (for example, **dpRetrieve** used by the JSA currently uses curl, although with a ```.netrc``` file). We might write replacement **adPut** and **adGet** scripts in Python that live in their own stand-alone module.
