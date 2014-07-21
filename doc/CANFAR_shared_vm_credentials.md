@@ -348,7 +348,7 @@ Another Condor configuration variable can be used give authorization to *all* us
 
 ## data web service and certificates
 
-Many users presently store their username and password in a .netrc file in order to obtain files from the data web service. It is generally not a good idea to store this information on the VMs, especially if they are to be shared. The injected proxy certificates can be used with some versions of **curl**. For example,
+Many users presently store their username and password in a ```.netrc``` file in order to obtain files from the data web service. It is generally not a good idea to store this information on the VMs, especially if they are to be shared. The injected proxy certificates can be used with some versions of **curl**. For example,
 
 ```
 $ curl -v -E ~/.ssl/cadcproxy.pem --location-trusted https://www.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/data/pub/JCMT/s8a20140517_00041_0008?runid=dtwbme1p06kygpf0 -o s8a20140517_00041_0008.sdf
@@ -404,6 +404,9 @@ echo
 As indicated in the final comment, this bundle may then be supplied to curl along with the user certificate to get it to work. This trick will probably also work with CADC issued proxy certificates. This kind of behaviour is also described in [this useful page that tests various versions of curl](https://wiki.nikhef.nl/grid/Funny_Curly_things).
 
 Going forward, it will be necessary to provide a scriptable method of interacting with the data web service using injected certificates. Some possible solutions include:
+
 1. Describing to the users how to create a CA bundle and execute successful curl commands as above.
+
 2. Try to submit upstream patches to NSS to obtain the desired behaviour with curl.
+
 3. Write a script that can easily be deployed on VMs to access the data web service. Note that there is already an **adPut** script in ```wservice/data_ws/scripts``` and ```wservice/transfer_ws/script``` that currently depends on this broken curl functionality. Some archives may also have this problem (for example, **dpRetrieve** used by the JSA currently uses curl, although with a ```.netrc``` file). We might write replacement **adPut** and **adGet** scripts in Python that live in their own stand-alone module.
