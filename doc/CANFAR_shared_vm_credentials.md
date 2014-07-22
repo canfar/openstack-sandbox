@@ -313,21 +313,17 @@ Since the first method has already been demonstrated to work (as a fall back), t
 
 Presently a user submits a job by ssh'ing to the login/submission host using their personal account, and typing ```condir_submit <submission file>```. The owner of that job is the user that submitted it. If we wish to move to a model whereby submission is handled by a web service, that service will perform the actual submission using a single, generic user account.
 
-In order for a user to submit jobs on behalf of another user, a super user can be defined. For example, this line can be added to ```/etc/condor_config.local```:
-
-```QUEUE_SUPER_USERS = root, condor, condoradm```
-
-The user ```condoradm``` has been added in this case, whereas the other two were already there by default in ```condor_config```.
-
-Next, the submission file needs to have a line added to it to indicate who the owner is, e.g.,
+The submission file needs to have a line added to it to indicate who the owner is, e.g.,
 ```
 +Owner = "echapin"
 ```
 
-Finally, if we are using GSI for authentication, an environment variable needs to be pointed at the user's proxy certificate, e.g.,
+If we are using GSI for authentication, an environment variable needs to be pointed at the user's proxy certificate, e.g.,
 ```$ export X509_USER_PROXY=/home/canfradm/echapin/cadcproxy.pem``` (alternatively it can be added to the submission file in the ```x509userproxy``` field).
 
-Now, the user ```condoradm``` should be able to submit a job on behalf of ```echapin```:
+**NOTE:** ensure that the permissions for the proxy certificate are set **chmod 600**.
+
+Now, the user ```canfradm``` should be able to submit a job on behalf of ```echapin```:
 ```
 canfradm(canfardev)$ condor_submit silly_sgwyn_x509userproxy.cansub
 Submitting job(s).
@@ -344,7 +340,43 @@ canfradm(canfardev)$ condor_q
 3 jobs; 0 completed, 0 removed, 3 idle, 0 running, 0 held, 0 suspended
 ```
 
-Another Condor configuration variable can be used give authorization to *all* users to modify jobs on behalf of eachother. We are not using it here, but it is called ```QUEUE_ALL_USERS_TRUSTED```.
+**To debug problems** see ```/var/log/condor/SchedLog```, and also execute condor commands with the ```-debug``` flag.
+
+While it did not seem to be necessary here (perhaps because we are using certificates?), you may need to make the user submitting jobs a super user in ```/etc/condor_config.local```:
+
+```QUEUE_SUPER_USERS = root, condor, canfradm```
+
+The user ```canfradm``` has been added in this case, whereas the other two were already there by default in ```condor_config```. Another Condor configuration variable can be used give authorization to *all* users to modify jobs on behalf of eachother is ```QUEUE_ALL_USERS_TRUSTED```.
+
+Note that it seems to be possible with this method to submit jobs that are owned by users that do not have accounts on the Condor submission host. For example, if we modify the mapping in /etc/condor/certificate_mapfile.condor as follows:
+
+```GSI CN=echapin_716 dr_foo```
+
+and similarly alter the submission file
+
+```
++Owner = "dr_foo"
+```
+
+we can then submit the job on behalf of this user:
+
+```
+canfradm(canfardev)$ condor_submit silly_sgwyn_x509userproxy.cansub
+Submitting job(s).
+1 job(s) submitted to cluster 1182.
+canfradm(canfardev)$ condor_q
+
+
+-- Submitter: canfardev.cadc.dao.nrc.ca : <132.246.195.119:9618> : canfardev.cadc.dao.nrc.ca
+ ID      OWNER            SUBMITTED     RUN_TIME ST PRI SIZE CMD               
+ 911.0   majorb          6/25 15:53   0+00:00:00 I  0   0.0  echoHome          
+ 912.0   majorb          8/6  12:55   0+00:00:00 I  0   0.0  echoHome          
+1182.0   dr_foo          7/22 10:44   0+00:00:00 I  0   0.0  silly_runme_x509us
+
+3 jobs; 0 completed, 0 removed, 3 idle, 0 running, 0 held, 0 suspended
+
+```
+
 
 ## data web service and certificates
 
