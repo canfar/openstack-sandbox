@@ -348,7 +348,7 @@ While it did not seem to be necessary here (perhaps because we are using certifi
 
 The user ```canfradm``` has been added in this case, whereas the other two were already there by default in ```condor_config```. Another Condor configuration variable can be used give authorization to *all* users to modify jobs on behalf of eachother is ```QUEUE_ALL_USERS_TRUSTED```.
 
-Note that it seems to be possible with this method to submit jobs that are owned by users that do not have accounts on the Condor submission host. For example, if we modify the mapping in /etc/condor/certificate_mapfile.condor as follows:
+Note that it seems to be possible with this method to submit jobs that are owned by users that do not have accounts on the Condor submission host. For example, if we modify the mapping in ```/etc/condor/certificate_mapfile.condor``` as follows:
 
 ```GSI CN=echapin_716 dr_foo```
 
@@ -377,6 +377,36 @@ canfradm(canfardev)$ condor_q
 
 ```
 
+**If we deactive GSI authentication**, it does not seem to be possible to have one user impersonate another. If we comment-out the ```SEC_DEFAULT*``` lines in the configuration, and restart Condor, and set the submission file to  ```+Owner = echapin```, it fails:
+
+```
+canfradm(canfardev)$ condor_submit silly_sgwyn_x509userproxy.cansub
+Submitting job(s)
+ERROR: Failed to set Owner="echapin" for job 1185.0 (13)
+
+ERROR: Failed to queue job.
+```
+
+Note the following lines in ```/var/log/condor/SchedLog```:
+
+```
+07/22/14 11:36:02 (pid:18922) Received TCP command 1112 (QMGMT_WRITE_CMD) from canfradm@cadc.dao.nrc.ca <132.246.195.119:47949>, access level WRITE
+07/22/14 11:36:02 (pid:18922) OwnerCheck retval 1 (success), super_user
+07/22/14 11:36:02 (pid:18922) OwnerCheck retval 1 (success), super_user
+07/22/14 11:36:02 (pid:18922) Queue super user not allowed to set owner to echapin, because this instance of the schedd has never seen that user submit any jobs.
+07/22/14 11:36:02 (pid:18922) SetAttribute security violation: setting owner to "echapin" when active owner is "canfradm"
+07/22/14 11:36:03 (pid:18922) condor_read(): Socket closed when trying to read 5 bytes from <132.246.195.119:47949>
+07/22/14 11:36:03 (pid:18922) IO: EOF reading packet header
+07/22/14 11:36:03 (pid:18922) QMGR Connection closed
+```
+
+[This web page](https://lists.cs.wisc.edu/archive/htcondor-users/2014-February/msg00082.shtml) describes the same problem and suggests setting a configuration option
+
+```
+QUEUE_SUPER_USER_MAY_IMPERSONATE = .*
+```
+
+However, this option is not available in our version of Condor.
 
 ## data web service and certificates
 
