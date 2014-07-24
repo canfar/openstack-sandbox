@@ -68,10 +68,10 @@ If we choose not to, a hybrid system in which [role authorization is handled ind
 
 If we simply map OpenStack tenants(projects) to our concept of groups, we should have the desired behaviour of **image sharing** between members of the same group. However, users will also be restricted by the resources allocated to that procject (CPU cores, memory). In other words, if a VM is created in project "A" which contains 10 users, and they all wish to execute jobs using that VM within that project, they will have to fight over whatever computer resources were allocated to the project.
 
-Alternatively, if a user wishes to allow someone in a different tenant to merely boot an image, the **glance member-create** command can be used to share a particular VM with that external tenant. In the Horizon dashboard the user from the shared tenant will not see the image in the "Image & Snapshots" window. However, if they launch an instance from the "Instances" window, the shared image will now be available to them to boot. In addition, an image can be marked "public" so that any tenant can boot it. In either case, only members from the original tenant will have the ability to alter it.
+Alternatively, if a user wishes to allow someone in a different tenant to merely boot an image, the **glance member-create** command can be used to share a particular VM with that external tenant. In the Horizon dashboard the user from the shared tenant will not see the image in the default "Images & Snapshots"; they will need to switch to the "Shared with Me" tab. They can also launch an instance from the "Instances" window. In addition, an image can be marked "public" so that any tenant can boot it.
 
 
-## A hybrid model fo CANFAR
+## A hybrid model for CANFAR
 
 OpenStack's management of identities and resources does not map perfectly on to the existing system. Presently CANFAR provides a custom-built portal for creating VMs from golden images and saving them, using our identity/group management services. Single (submitting) user accounts on external cloud providers are then used to execute batch jobs from the Condor queue. We wish to use the OpenStack dashboard for vmod services, while retaining the flexibility of the existing model for batch processing.
 
