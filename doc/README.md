@@ -11,3 +11,5 @@
 5. [CANFAR_shared_vm_credentials.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_shared_vm_credentials.md): Condor credential injection, VM sharing, and submission from generic accounts.
 
 6. [OpenStack_identity.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md): Identity management in OpenStack and implications for proc and vmod.
+
+7. [CANFAR_pam.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_pam.md): Using PAM modules to facilitate user access to new VMs.
