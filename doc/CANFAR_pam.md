@@ -9,7 +9,7 @@ We are considering using Pluggable Authentication Modules (PAM) to allow users t
 
 ## Feasibility of writing a Keystone PAM module
 
-PAM modules in Linux are written in C, meaning that we will have to get into autoconf/automake to make it portable amongst Linux distributions. [The detailed guide](http://www.linux-pam.org/Linux-PAM-html/mwg-see-programming-sec.html) is moderately dense, but there are some good examples out there [like this one](http://www.rkeene.org/projects/info/wiki/222) (note at the bottom of that page is a link to a second example called "pam_success" which is a tarball of a skeleton project using GNU autotools).
+PAM modules in Linux are written in C, meaning that we will have to get into autoconf/automake to make it portable amongst Linux distributions. [The detailed guide](http://www.linux-pam.org/Linux-PAM-html/Linux-PAM_MWG.html) is moderately dense, but there are some good examples out there [like this one](http://www.rkeene.org/projects/info/wiki/222) (note at the bottom of that page is a link to a second example called "pam_success" which is a tarball of a skeleton project using GNU autotools).
 
 This module will need to talk to Keystone, and fortunately there is already a [C Keystone Client](https://github.com/RedHatEMEA/c-keystoneclient). This project includes ```libkeystoneclient``` which supports UUID and PKI-based tokens or username/password authentication, and Keystone 2.0 API endpoints. There is also a sample ```keystoneclient``` that shows how to use it.
 
