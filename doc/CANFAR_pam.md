@@ -56,10 +56,8 @@ Once booted, [this guide](http://www.server-world.info/en/note?os=CentOS_6&p=lda
 
 In order to test PAM authentication using LDAP, we instantiate a stock Ubuntu 14.04 VM (using the LDAP security group mentioned above). Then we mainly follow [this guide](https://help.ubuntu.com/community/LDAPClientAuthentication) with some additional information from [here](http://devnotcorp.wordpress.com/2011/05/10/ldap-authentication-for-ubuntu-client/)
 
-1. First we install and configure client packages.
-   ```$ sudo apt-get install ldap-auth-client nscd```
-   The configuration asks some questions, to which we answer:
-   ```ldap://199.116.235.100,dc=server,dc=world,3,no,no```
+1. First we install and configure client packages: ```$ sudo apt-get install ldap-auth-client nscd```
+   The configuration asks some questions, to which we answer: ```ldap://199.116.235.100,dc=server,dc=world,3,no,no```
 
 2. ```$ sudo auth-client-config -t nss -p lac_ldap```
 
