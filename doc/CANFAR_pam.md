@@ -94,17 +94,21 @@ Client configuration is slightly different from the previous Ubuntu example. [Th
 2. Turn on LDAP name service daemon: ```$ sudo chkconfig nslcd on```
 
 3. Edit ```authconfig```:
-   ```$ sudo vim /etc/sysconfig/authconfig
+   ```
+   $ sudo vim /etc/sysconfig/authconfig
    USELDAPAUTH=yes
-   USELDAP=yes```
+   USELDAP=yes
+   ```
 
 4. Enable the LDAP backend for PAM and auto home-directory generation:
-   ```$ sudo vim /etc/pam.d/system-auth
+   ```
+   $ sudo vim /etc/pam.d/system-auth
    auth        sufficient    pam_ldap.so use_first_pass
    account     [default=bad success=ok user_unknown=ignore] pam_ldap.so
    password    sufficient    pam_ldap.so use_authok
    session     optional      pam_ldap
-   session     required      pam_mkhomedir.so skel=/etc/skel umask=0077```
+   session     required      pam_mkhomedir.so skel=/etc/skel umask=0077
+   ```
 
 5. Run ```authconfig``` to setup config files: ```sudo authconfig --enableldap --ldapserver="ldap://199.116.235.100" --ldapbasedn="dc=server,dc=world" --updateall```
 
