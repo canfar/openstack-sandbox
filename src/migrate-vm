@@ -276,16 +276,16 @@ try:
                               % (guestos), shell=True)
 
     if os_type in ['sl5','sl6']:
-        install_extlinux = "yum -y install syslinux-extlinux"
+        install_extlinux = "yum -y install syslinux-extlinux cloud-init"
     else:
-        install_extlinux = "apt-get -y install extlinux"
+        install_extlinux = "apt-get -y install extlinux cloud-init"
 
     if os_type is 'sl5':
         install_vmstore = "easy_install-2.6"
     else:
         install_vmstore = "easy_install"
 
-    print "+++ Install EXTLINUX dependency for vmsave..."
+    print "+++ Install extlinux (dependency for vmsave) and cloud-init..."
     subprocess.check_call("chroot %s %s" \
                           % (guestos,install_extlinux), shell=True)
 
