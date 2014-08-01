@@ -29,7 +29,7 @@ The rights and privileges of a particular role for a service are defined by its 
 
 **Question:**
 
-Is CANFAR seen as a domain or a project to a given cloud provider? For batch processing we are using Condor and Cloud Scheduler to distribute the work. In this case we probably don't want to specify individual allocations for each user/group in the CANFAR sense. However, we may wish to have individual projects for vmod (i.e., a single core + static IP is granted to each user for configuration purposes).
+Is CANFAR seen as a **domain** or a **project** to a given cloud provider? For batch processing we are using Condor and Cloud Scheduler to distribute the work. In this case we probably don't want to specify individual allocations for each user/group in the CANFAR sense. However, we may wish to have individual projects for vmod (i.e., a single core + static IP is granted to each user for configuration purposes).
 
 
 ## Integration with LDAP
@@ -97,3 +97,37 @@ If, for the moment, we assume a generic account will submit the jobs, it might w
 
 **Note:** even in the case of a single cloud, this model will require two copies of the image -- one in the particular user/tenant, and another for the generic job submission user/tenant. Alternatively, we may simply enforce a policy whereby all user VMs are shared with the submission user/tenant for read-only access (using **glance member-create**).
 
+## OpenStack quota management
+
+Each project/tenant typically has quotas for resources (CPU cores, memory, storage etc.). Assuming we work with the hybrid model mentioned above (a CANFAR domain, including individual user projects, and a seperate project for batch processing) it will probably make sense to have:
+
+* **a very large quota for the batch project**, but leaving enough resources so that a few vmod sessions can always be executed
+
+
+* **default project quotas** (including individual users) that include  a single public IP. If a project wants larger vmod resources (i.e., more IPs for long-lived VMs) they can be requested.
+
+Quotas are managed by the individual services in an OpenStack cloud. We will probably be the most interested in managing computer resources (numbers of cores, instances, memory, fixed and static IPs). [This document](http://docs.openstack.org/user-guide-admin/content/cli_set_quotas.html) gives a good overview. For example, these are the nova quotas for the CANFAR project on the Cybera cloud:
+
+    ```
+    $ nova quota-show
+    +-----------------------------+-------+
+    | Quota                       | Limit |
+    +-----------------------------+-------+
+    | instances                   | 8     |
+    | cores                       | 8     |
+    | ram                         | 8192  |
+    | floating_ips                | 3     |
+    | fixed_ips                   | -1    |
+    | metadata_items              | 128   |
+    | injected_files              | 5     |
+    | injected_file_content_bytes | 10240 |
+    | injected_file_path_bytes    | 255   |
+    | key_pairs                   | 100   |
+    | security_groups             | 10    |
+    | security_group_rules        | 20    |
+    +-----------------------------+-------+``
+    ```
+
+An administrator would then be able to modify these.
+
+It would be desirable if the entire CANFAR domain could be assigned a single top-level quota, which we could then subdivide as we see fit. However, **there is currently no domain-based quota managenment**. [This document](https://wiki.openstack.org/wiki/DomainQuotaManagementAndEnforcement) provides a blueprint for domain-based quotas, and information about its driver dvelopment is [given here](https://blueprints.launchpad.net/nova/+spec/domain-quota-driver). It's interesting to note from that latter document that administrators will probably have to **choose between domain and project-based quotas**, i.e., a hybrid of both methods will probably not be possible when this is eventually implemented.
