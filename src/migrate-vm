@@ -23,6 +23,10 @@ valid_os_type = { "sl5" : "Scientific Linux release 5",
                   "ub12" : "Ubuntu 12.04",
                   "ub13" : "Ubuntu 13.10" }
 
+# The user that cloud-init will use for ssh key injection. Note that
+# this needs to be added to /etc/cloud/cloud.cfg
+newuser = 'canfar-user'
+
 try:
     # parse command line
     parser = argparse.ArgumentParser(description='Migrate old Xen-style CANFAR VMs for compatibility with OpenStack/KVM')
@@ -50,6 +54,8 @@ try:
         raise Exception("Couldn't locate %s" % (vmstore))
 except:
     traceback.print_exc(file=sys.stdout)
+    print "--- ERROR: maybe you need to:\n    $ vcp vos:echapin/%s ." \
+        % (vmstore)
     sys.exit(1)
 
 # do we have kpartx installed?
@@ -290,23 +296,22 @@ try:
     subprocess.check_call("chroot %s %s" \
                           % (guestos,install_extlinux), shell=True)
 
-    # The SL5/Ubuntu 12.04 cloud-init packages are 0.6.3 which doesn't
-    # automatically create the login user for you, so we do that here
-    if os_type is 'sl5':
-        newuser = 'ec2-user'  # expected in default /etc/cloud/cloud.cfg
-        print "+++ Create user %s for ssh key injection..." % (newuser)
-        subprocess.check_call("chroot %s adduser %s" \
-                              % (guestos,newuser), shell=True)
-
-    if os_type is 'ub12':
-        newuser = 'ubuntu'  # expected in default /etc/cloud/cloud.cfg
-        print "+++ Create user %s for ssh key injection..." % (newuser)
-        subprocess.check_call("chroot %s adduser --disabled-password --gecos '' %s" \
-                              % (guestos,newuser), shell=True)
-
     print "+++ Install %s" % (vmstore)
     subprocess.check_call("chroot %s %s /tmp/%s" \
                           % (guestos,install_vmstore,vmstore), shell=True)
+
+    # The SL5/Ubuntu 12.04 cloud-init packages are 0.6.3 which doesn't
+    # automatically create the login user for you, so we do that here
+    if os_type in ['sl5','ub12']:
+        print "+++ Create user %s for cloud-init ssh key injection..." \
+            % (newuser)
+
+        if os_type is 'sl5':
+            subprocess.check_call("chroot %s adduser %s" \
+                                  % (guestos,newuser), shell=True)
+        if os_type is 'ub12':
+            subprocess.check_call("chroot %s adduser --disabled-password --gecos '' %s" \
+                              % (guestos,newuser), shell=True)
 
 except:
     traceback.print_exc(file=sys.stdout)
@@ -512,6 +517,35 @@ except:
     sys.exit(1)
 
 
+# -----------------------------------------------------------------------------
+# Configure newuser in cloud-init for ssh key injection
+# -----------------------------------------------------------------------------
+
+try:
+    cloudcfgfile = "/etc/cloud/cloud.cfg"
+    print "+++ Updating %s to add user %s" % (cloudcfgfile,newuser)
+
+    cloudcfg = g.read_file(cloudcfgfile)
+
+    if os_type is 'sl5':
+        cloudcfg = re.sub("user:\s*ec2-user","user: %s" % newuser, cloudcfg)
+
+    if os_type is 'sl6':
+        cloudcfg = re.sub("name:\s*cloud-user","name: %s" % newuser, cloudcfg)
+
+    if os_type is 'ub12':
+        cloudcfg = re.sub("user:\s*ubuntu","user: %s" % newuser, cloudcfg)
+
+    if os_type is 'ub13':
+        cloudcfg = re.sub("name:\s*ubuntu","name: %s" % newuser, cloudcfg)
+
+    print cloudcfg
+    g.write(cloudcfgfile,cloudcfg)
+
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "--- ERROR: Didn't work"
+    sys.exit(1)
 
 print "DONE"
 g.shutdown()
