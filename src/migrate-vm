@@ -290,6 +290,20 @@ try:
     subprocess.check_call("chroot %s %s" \
                           % (guestos,install_extlinux), shell=True)
 
+    # The SL5/Ubuntu 12.04 cloud-init packages are 0.6.3 which doesn't
+    # automatically create the login user for you, so we do that here
+    if os_type is 'sl5':
+        newuser = 'ec2-user'  # expected in default /etc/cloud/cloud.cfg
+        print "+++ Create user %s for ssh key injection..." % (newuser)
+        subprocess.check_call("chroot %s adduser %s" \
+                              % (guestos,newuser), shell=True)
+
+    if os_type is 'ub12':
+        newuser = 'ubuntu'  # expected in default /etc/cloud/cloud.cfg
+        print "+++ Create user %s for ssh key injection..." % (newuser)
+        subprocess.check_call("chroot %s adduser --disabled-password --gecos '' %s" \
+                              % (guestos,newuser), shell=True)
+
     print "+++ Install %s" % (vmstore)
     subprocess.check_call("chroot %s %s /tmp/%s" \
                           % (guestos,install_vmstore,vmstore), shell=True)
