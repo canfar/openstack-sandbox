@@ -49,6 +49,7 @@ try:
     if not os.path.isfile(vmstore):
         raise Exception("Couldn't locate %s" % (vmstore))
 except:
+    traceback.print_exc(file=sys.stdout)
     sys.exit(1)
 
 # do we have kpartx installed?
