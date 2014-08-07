@@ -402,10 +402,10 @@ Note that these generic users are defined in the cloud-init configuration file, 
 
 The full set of users into which the ssh keys will be injected is as follows:
 
-Scientific Linux 5: **ec2-user**
-Scientific Linux 6: **cloud-user**
-Ubuntu 12.04: **ubuntu**
-Ubuntu 13.10: **ubuntu**
+* Scientific Linux 5: **ec2-user**
+* Scientific Linux 6: **cloud-user**
+* Ubuntu 12.04: **ubuntu**
+* Ubuntu 13.10: **ubuntu**
 
 Note that the VMs will display the following message if you attempt to connect to a VM as **root** which will tell you the correct name of the login user:
 
