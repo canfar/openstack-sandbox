@@ -345,3 +345,71 @@ The VM conversion to KVM as described in the previous section has the advantage 
     4. **Ubuntu 13.10**
 
         Same procedure as Ubuntu 12.04.
+
+
+## Other software
+
+Several other pieces of software should also be installed.
+
+### vmstore
+
+In order to maintain full backwards compatibility with Nimbus for vmod, the **vmstore** package, which provides **vmsave**, must be updated. Using vmsave from an older version will remove the partitioning and install the **GRUB** bootloader (replacing **SYSLINUX**) and it will no longer work with OpenStack. Version 0.1.3 accounts for the new partitioned VMs, and saving a VM with this version (e.g., from within a Nimbus vmod instance) will remain compatible with Openstack / KVM. A copy can be obtained from vospace:
+
+```
+$ vcp vos:echapin/vmstore-0.1.3.tar.gz
+```
+
+One method of upgrading the module is using easy_install from within the guestmounted / chroot'ed image. However, for **all but the Scientific Linux 5 VMs**, an upgrade to **setuptools** (which provides easy_install) is first required (see [this page](http://stackoverflow.com/questions/11425106/python-pip-install-fails-inval\
+id-command-egg-info) for details):
+
+```
+$ pip install --upgrade setuptools
+```
+
+Then it is possible to install vmstore. For Scientific Linux 5:
+
+```
+$ easy_install-2.6 vmstore-0.1.3.tar.gz
+```
+
+For the other VMs:
+
+```
+$ easy_install vmstore-0.1.3.tar.gz
+```
+
+### cloud-init
+
+Most Linux distributions now install a package called **cloud-init** which simplifies dynamic configuration of a VM, and integrates well with OpenStack. Among other things, it can inject ssh public keys into a generic account upon instantiation (see [this page](http://docs.openstack.org/user-guide/content/user-data.html) for details). A converted VM will probably already have an ssh key statically added to ```.ssh/authorized_keys``` for the CANFAR user's personal account. In the future, however, all key injection should use this more modern cloud-init style. Furthermore, if the user does not have access to the private key associated with the public key that was originally injected when it was created, this will give them a means of entering the VM.
+
+The first step is to install the **cloud-init** package (with either **yum** or **apt-get** depending on the distribution).
+
+For Scientific Linux 5 and Ubuntu 12.04, an older version 0.6.3 of cloud-init is provided. While the newer versions automatically create the generic users into which the ssh keys will be generated, the accounts must already be present in order to work with these old versions. The users can simply be added within the guestmounted / chroot'ed VM.
+
+For Scientific Linux 5:
+
+```
+$ adduser ec2-user
+```
+
+For Ubuntu 12.04:
+
+```
+$ adduser --disabled-password --gecos '' ubuntu
+```
+
+Note that these generic users are defined in the cloud-init configuration file, ```/etc/cloud/cloud.cfg```.
+
+The full set of users into which the ssh keys will be injected is as follows:
+
+Scientific Linux 5: **ec2-user**
+Scientific Linux 6: **cloud-user**
+Ubuntu 12.04: **ubuntu**
+Ubuntu 13.10: **ubuntu**
+
+Note that the VMs will display the following message if you attempt to connect to a VM as **root** which will tell you the correct name of the login user:
+
+```
+$ ssh root@10.1.0.224
+Please login as the user "ubuntu" rather than the user "root".
+```
