@@ -124,6 +124,8 @@ Deleting and creating flavors can be accomplished with ```nova flavor-create``` 
 
 In current OpenStack clouds, users cannot generate flavors, which gives them less fine-grained control of their VM instances. However, most users probably do not care about this level of control, and giving them a small number of flavors (less than 20 say) should be perfectly manageable, and would most likely meet all user requirements. Adding flavors to an OpenStack cloud is trivial for an administrator, and will not happen very often, so we can handle this manually at first.
 
+[This document](http://docs.openstack.org/openstack-ops/content/flavors.html) describes some of the admin tasks related to flavors in more detail. In particular, it may be easy to configure the policies on the server side to enable CANFAR admins to manage flavours themselves. Regardless, the flavour matrix need only be made available to a single tenant: that which will execute batch jobs (assuming we follow the strategy outlined [here](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#batch-processing)).
+
 **Question:** is managing cross-clouds flavors necessary?
 
 Note that flavors can be customized to make them accessible only to specific users, e.g.
