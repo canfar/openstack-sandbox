@@ -139,7 +139,9 @@ If CANFAR is granted a domain that can be self-administered, it may be possible 
 ### Domain-specific Keystone drivers
 
 The **next** release of OpenStack (Juno) will have a feature that is very useful: [domain-specific drivers](http://docs.openstack.org/developer/keystone/configuration.html#domain-specific-drivers).
-This would enable the cloud provider to completely delegate auhorization within that domain to our LDAP back end. Note that there is a *Key New Feature* in the [IceHouse release notes](https://wiki.openstack.org/wiki/ReleaseNotes/Icehouse#Key_New_Features_5) for **OpenStack Identity (Keystone)** which mentions ```Additional plugins are provided to handle external authentication via REMOTE_USER with respect to single-domain versus multi-domain deployments.``` However, this feature does not seem to apply to the domain-specific problem. See [this page](http://docs.openstack.org/developer/keystone/external-auth.html) for further information regarding external authentication with Keystone.
+This would enable the cloud provider to completely delegate auhorization within that domain to our LDAP back end. Note that there is a *Key New Feature* in the [IceHouse release notes](https://wiki.openstack.org/wiki/ReleaseNotes/Icehouse#Key_New_Features_5) for **OpenStack Identity (Keystone)** which mentions ```Additional plugins are provided to handle external authentication via REMOTE_USER with respect to single-domain versus multi-domain deployments.``` However, this feature does not seem to apply to the domain-specific problem. See [this page](http://docs.openstack.org/developer/keystone/external-auth.html) for further information regarding external authentication with Keystone. See also [this post](http://www.gossamer-threads.com/lists/openstack/dev/39786).
+
+At some point someone found some information about chaining Keystone instances together. The only thing that seems to mention this is an [old email from 2012](https://www.redhat.com/archives/rhos-list/2012-September/msg00021.html).
 
 ### Alternatives to domain-specific Keystone drivers
 
