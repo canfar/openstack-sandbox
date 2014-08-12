@@ -32,9 +32,9 @@ The rights and privileges of a particular role for a service are defined by its 
 Is CANFAR seen as a **domain** or a **project** to a given cloud provider? For batch processing we are using Condor and Cloud Scheduler to distribute the work. In this case we probably don't want to specify individual allocations for each user/group in the CANFAR sense. However, we may wish to have individual projects for vmod (i.e., a single core + static IP is granted to each user for configuration purposes).
 
 
-## Integration with LDAP
+## Basic integration with LDAP
 
-The basic Keystone configuration to use LDAP as an identity service backend is fairly straightforward. The basic modifications to ```keystone.conf``` according to [this page](http://docs.openstack.org/admin-guide-cloud/content/configuring-keystone-for-ldap-backend.html) are as follows:
+The basic Keystone configuration to use LDAP as an identity service backend is fairly straightforward, although *domain-specific* drivers will probably not be available until the OpenStack Juno release (see below). The basic modifications to ```keystone.conf``` according to [this page](http://docs.openstack.org/admin-guide-cloud/content/configuring-keystone-for-ldap-backend.html) are as follows:
 
 ```
 [ldap]
@@ -134,10 +134,17 @@ It would be desirable if the entire CANFAR domain could be assigned a single top
 
 ## Domain configuration
 
-If, indeed, CANFAR cloud providers create a domain that we can administer, some server-side configuration work needs to be done.
+If CANFAR is granted a domain that can be self-administered, it may be possible to add/remove CANFAR users, create flavours (for batch processing, etc.) without requiring additional server-side configuration. If a prototype needs to be set up, see [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html) for details on setting up domains, designating domain administrators, and managing resources within domains (there is a two-step bootstrap process which must be followed).
 
-One possibility is for an external CANFAR Keystone instance (which in turn uses an LDAP back end) to be added as a [domain-specific driver](http://docs.openstack.org/developer/keystone/configuration.html#domain-specific-drivers) in the configuration for the Keystone instance of a particular cloud. Since this Keystone instance requires unique user and group IDs, it will dynamically build up a local mapping for all users to the domains in which they reside (i.e., after the first time a user is authenticated, it will subsequently know that a given CANFAR user **X** should be authenticated in the CANFAR domain). The page above notes that **this feature will only be available in the Juno release**.
+### Domain-specific Keystone drivers
 
-However, there is a *Key New Feature* in the [IceHouse release notes](https://wiki.openstack.org/wiki/ReleaseNotes/Icehouse#OpenStack_Identity_.28Keystone.29) for **OpenStack Identity (Keystone)** which mentions ```Additional plugins are provided to handle external authentication via REMOTE_USER with respect to single-domain versus multi-domain deployments.``` See [this page](http://docs.openstack.org/developer/keystone/external-auth.html) for further information regarding external authentication with Keystone.
+The **next** release of OpenStack (Juno) will have a feature that is very useful: [domain-specific drivers](http://docs.openstack.org/developer/keystone/configuration.html#domain-specific-drivers).
+This would enable the cloud provider to completely delegate auhorization within that domain to our LDAP back end. Note that there is a *Key New Feature* in the [IceHouse release notes](https://wiki.openstack.org/wiki/ReleaseNotes/Icehouse#Key_New_Features_5) for **OpenStack Identity (Keystone)** which mentions ```Additional plugins are provided to handle external authentication via REMOTE_USER with respect to single-domain versus multi-domain deployments.``` However, this feature does not seem to apply to the domain-specific problem. See [this page](http://docs.openstack.org/developer/keystone/external-auth.html) for further information regarding external authentication with Keystone.
 
-Next, an initial configuration needs to be made using *default policy files* for the default, non multi-domain installation. After creating an **admin domain** and **cloud admin** user, you can switch to the ```policy.v3cloudsample.json``` with multi-domain support. See [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html) for details on setting up domains, designating domain administrators, and managing resources within domains. Another good resource is [this page](http://www.mirantis.com/blog/manage-openstack-projects-using-domains-havana/) which also describes some of the integration with the Horizon dashboard.
+### Alternatives to domain-specific Keystone drivers
+
+* It may be possible to configure an **IceHouse** Keystone to support multiple identity provides using [Shibboleth](https://shibboleth.net/), according to the [IceHouse release notes](https://wiki.openstack.org/wiki/ReleaseNotes/Icehouse#Key_New_Features_5). This feature is also mentioned in [this presentation](http://dolphm.com/openstack-juno-design-summit-outcomes-for-keystone/) (see Identity Federation). From that same presentation, they also describe the future of hierarchical tenants which will probably replace the currently flat concepts of domains and projects.
+
+* It is possible to configure **stacked authorization** which uses an LDAP server as a fallback if a user cannot be located in the local SQL database. [This blog post](http://www.mattfischer.com/blog/?p=576) describes the method using this [GitHub project](https://github.com/SUSE-Cloud/keystone-hybrid-backend).
+
+* If CANFAR has an administrative user that is capable of creating new users, it would be possible to write an **agent for populating the cloud providers identity service** with CANFAR users (i.e., by issuing **keystone** commands as the domain admin user).
