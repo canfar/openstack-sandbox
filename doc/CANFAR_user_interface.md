@@ -20,7 +20,7 @@ An overview of the OpenStack API is given here: http://docs.openstack.org/api/qu
 
 According to this web page, http://www.metacloud.com/2014/03/17/openstack-horizon-controlling-cloud-using-django/, Horizon consists of a modular base library, and a reference dashboard that combines them in to a useable application. If at some point in the future we wish to build a "meta dashboard" to handle multiple clouds, it's conceivable that we might build such an application from existing components in the Horizon core libraries. If and when this is needed, we might also tackle the problem of the central VM repository mentioned in the previous section as part of this work.
 
-In the short term it will probably suffice to install and customize a local CANFAR horizon dashboard from package repositories.
+In the short term it will probably suffice to install and customize a local CANFAR horizon dashboard from package repositories. [This page shows](http://docs.openstack.org/icehouse/install-guide/install/apt/content/install_dashboard.html) how to set it up for Ubuntu 12.04/14.04 from repositories.
 
 ### Image distribution using Glint
 
