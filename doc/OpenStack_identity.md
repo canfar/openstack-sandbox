@@ -68,8 +68,9 @@ If we choose not to, a hybrid system in which [role authorization is handled ind
 
 If we simply map OpenStack tenants(projects) to our concept of groups, we should have the desired behaviour of **image sharing** between members of the same group. However, users will also be restricted by the resources allocated to that procject (CPU cores, memory). In other words, if a VM is created in project "A" which contains 10 users, and they all wish to execute jobs using that VM within that project, they will have to fight over whatever computer resources were allocated to the project.
 
-Alternatively, if a user wishes to allow someone in a different tenant to merely boot an image, the **glance member-create** command can be used to share a particular VM with that external tenant. In the Horizon dashboard the user from the shared tenant will not see the image in the default "Images & Snapshots"; they will need to switch to the "Shared with Me" tab. They can also launch an instance from the "Instances" window. In addition, an image can be marked "public" so that any tenant can boot it.
+Alternatively, if a user wishes to allow someone in a different tenant to merely boot an image, the **glance member-create** command can be used to share a particular VM with that external tenant. In the Horizon dashboard the user from the shared tenant will not see the image in the default "Images & Snapshots"; they will need to switch to the "Shared with Me" tab. They can also launch an instance from the "Instances" window. They will not, however, be able to delete the image. In addition, an image can be marked "public" so that any tenant can boot it.
 
+Note that *image protection* is an unrelated feature (e.g., using **glance** or the dashboard). This is simply a read-only flag that can be set by users in the tenant that owns the image to prevent accidental modification / deletion. It can be unset at any time.
 
 ## A hybrid model for CANFAR
 
