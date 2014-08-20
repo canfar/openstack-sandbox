@@ -135,7 +135,7 @@ It would be desirable if the entire CANFAR domain could be assigned a single top
 
 ## Domain configuration
 
-If CANFAR is granted a domain that can be self-administered, it may be possible to add/remove CANFAR users, create flavours (for batch processing, etc.) without requiring additional server-side configuration. If a prototype needs to be set up, see [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html) for details on setting up domains, designating domain administrators, and managing resources within domains (there is a two-step bootstrap process which must be followed).
+If CANFAR is granted a domain that can be self-administered, it may be possible to add/remove CANFAR users, create flavours (for batch processing, etc.) without requiring additional server-side configuration. If a prototype needs to be set up, see [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html) for details on setting up domains, designating domain administrators, and managing resources within domains (there is a two-step bootstrap process which must be followed). Another good resource (although aimed at the Havana release) is [here](http://www.mirantis.com/blog/manage-openstack-projects-using-domains-havana/).
 
 ### Domain-specific Keystone drivers
 
