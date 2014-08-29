@@ -135,7 +135,39 @@ It would be desirable if the entire CANFAR domain could be assigned a single top
 
 ## Domain configuration
 
-If CANFAR is granted a domain that can be self-administered, it may be possible to add/remove CANFAR users, create flavours (for batch processing, etc.) without requiring additional server-side configuration. If a prototype needs to be set up, see [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html) for details on setting up domains, designating domain administrators, and managing resources within domains (there is a two-step bootstrap process which must be followed). Another good resource (although aimed at the Havana release) is [here](http://www.mirantis.com/blog/manage-openstack-projects-using-domains-havana/).
+If CANFAR is granted a domain that can be self-administered, it may be possible to add/remove CANFAR users, create flavours (for batch processing, etc.).
+
+### Basic setup
+
+In **IceHouse**, basic multi-domain support can be activated fairly easily.
+
+1. **domain-enabled dashboard**
+
+    Edit ```/etc/openstack-dashboard/local_settings.py``` along the following lines:
+
+    ```OPENSTACK_API_VERSIONS = {
+     "identity": 3
+    }
+    OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT = True
+    OPENSTACK_KEYSTONE_URL = "http://x.x.x.x:5000/v3"```
+
+    The login page will now have an additional ```Domain``` field. Users that already existed in the initial single-domain setup belong to the ```default``` domain, such as the ```admin``` user. The ```admin``` user can now manage domains through the **Identity** windows.
+
+    At this stage, the dashboard is using the [v3 authentication API](http://developer.openstack.org/api-ref-identity-v3.html). This already exposes a lot of functionality in terms of user management, although no other OpenStack services have had any configuration changes.
+
+2. **use policy.v3cloudsample.json for keystone**
+
+    The default policies (rules for what different roles can do) are aimed at the single-domain case. OpenStack ships a more complicated policy file for keystone called ```policy.v3cloudsample.json```. To use it, replace ```/etc/keystone/policy.json``` with its contents.
+
+    **If you want a single admin to control everything** it appears that you edit a single line in the file and replace the string ```admin_domain_id``` with ```default```. This is the domain to which any admin must belong in order to manage domains, and ```default``` is the default of the normal **admin** user.
+
+    **Domain-specific admins** can, in theory, be set up following [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html). The idea is to create a new domain in which the domain adminstrator will live, and then the ID of that domain is used for the ```admin_domain_id``` mentioned above in policy.json.
+
+    **Update dashboard policies** The dashboard has its own copy of the OpenStack policy files. This is probably so that the dashboard can correctly display/hide functionality that matches the configured policies. These typically reside in ```/etc/openstack=dashboard/[service]_policy.json```. Ensure that the updated keystone policy is here (if the dashboard is on the same machine running the keystone service, use a soft link).
+
+    **Problems** Current tests with IceHouse using an RDO installation don't work properly. Domains and users can be made, but any user that is not a member of the **default** domain cannot interact with any of the services other than keystone. A question has been posted and unanswered at the time of writing [here](https://ask.openstack.org/en/question/45872/icehouse-dashboard-problems-using-multi-domain-support/).
+
+    **Some other resources include** this description of [keystone domains in Havana](https://www.mirantis.com/blog/manage-openstack-projects-using-domains-havana/), some [IceHouse release notes about Stack domain users](https://wiki.openstack.org/wiki/ReleaseNotes/Icehouse#Stack_domain_users), and this [blog entry about the Keystone v2.0 to v3 migration](http://www.symantec.com/connect/blogs/how-switch-keystone-v20-v3).
 
 ### Domain-specific Keystone drivers
 
