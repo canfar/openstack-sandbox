@@ -157,19 +157,39 @@ In **IceHouse**, basic multi-domain support can be activated fairly easily.
 
     At this stage, the dashboard is using the [v3 authentication API](http://developer.openstack.org/api-ref-identity-v3.html). This already exposes a lot of functionality in terms of user management, although no other OpenStack services have had any configuration changes.
 
-2. **use policy.v3cloudsample.json for keystone**
+2. **configure other services to use the v3 authentication API**
 
-    The default policies (rules for what different roles can do) are aimed at the single-domain case. OpenStack ships a more complicated policy file for keystone called ```policy.v3cloudsample.json```. To use it, replace ```/etc/keystone/policy.json``` with its contents.
+    Services such as **nova** and **glance** contact the authentication service internally. If they are not configured to use the v3 API then they will only work for users with **tokens that are scoped to projects in the default domain**. To enable multi-domain users to work, locate the ```[keystone_authtoken]``` section and add ```auth_version=v3.0``` to all of the following files:
 
-    **If you want a single admin to control everything** it appears that you edit a single line in the file and replace the string ```admin_domain_id``` with ```default```. This is the domain to which any admin must belong in order to manage domains, and ```default``` is the default of the normal **admin** user.
+    ```
+    /etc/nova/nova.conf
+    /etc/ceilometer/ceilometer.conf
+    /etc/cinder/cinder.conf
+    /etc/glance/glance-api.conf
+    /etc/glance/glance-registry.conf
+    /etc/neutron/neutron.conf
+    ```
 
-    **Domain-specific admins** can, in theory, be set up following [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html). The idea is to create a new domain in which the domain adminstrator will live, and then the ID of that domain is used for the ```admin_domain_id``` mentioned above in policy.json.
+    This [question](https://ask.openstack.org/en/question/45872/icehouse-dashboard-problems-using-multi-domain-support/) was asked to get to the bottom of this particular issue.
+
+    The **admin** user, as mentioned above, can create and administer all domains, projects and users through the dashboard, as well as setting **domain contexts** to filter the dashboard view to display only users, projects (and possibly resources?) in use by a single domain.
+
+    Everyone (admins and users of other domains) will now be able to view images, launch instances etc.
+
+3. **create delegated domain administrators**
+
+    It is possible, from the authentication service point of view, to set up **domain administrators** that can only modify users and projects in their domain.
+
+    This is largely controlled with policy files (rules for what different roles can do in the different services). The default policies are aimed at the single-domain case. OpenStack ships a more complicated policy file for keystone called ```policy.v3cloudsample.json```. To use it, follow [this guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html).
+
+    The idea is to first create a new **admin_domain** (while the default ```/etc/keystone/policy.json``` is active) in which a special **cloud_admin** user is created, and will have the unique ability to create new domains. The ID of this admin_domain is used to replace ```admin_domain_id``` in ```policy.v3cloudsample.json```, and then this file is used to replace ```/etc/keystone/policy.json```.
+
+    Once **keystone** is restarted, the cloud_admin can create new domains, and administrators for those domains.
 
     **Update dashboard policies** The dashboard has its own copy of the OpenStack policy files. This is probably so that the dashboard can correctly display/hide functionality that matches the configured policies. These typically reside in ```/etc/openstack=dashboard/[service]_policy.json```. Ensure that the updated keystone policy is here (if the dashboard is on the same machine running the keystone service, use a soft link).
 
-    **Problems** Current tests with IceHouse using an RDO installation don't work properly. Domains and users can be made, but any user that is not a member of the **default** domain cannot interact with any of the services other than keystone. A question has been posted and unanswered at the time of writing [here](https://ask.openstack.org/en/question/45872/icehouse-dashboard-problems-using-multi-domain-support/).
+    **Problems** Unfortunately, while this setup should provide a good user experience, administration of the cloud can no longer be achieved through the dashboard. The REST API is the only way to create domains, users, and projects in those domains.
 
-    **Some other resources include** this description of [keystone domains in Havana](https://www.mirantis.com/blog/manage-openstack-projects-using-domains-havana/), some [IceHouse release notes about Stack domain users](https://wiki.openstack.org/wiki/ReleaseNotes/Icehouse#Stack_domain_users), and this [blog entry about the Keystone v2.0 to v3 migration](http://www.symantec.com/connect/blogs/how-switch-keystone-v20-v3).
 
 ### Domain-specific Keystone drivers
 
