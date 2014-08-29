@@ -145,11 +145,13 @@ In **IceHouse**, basic multi-domain support can be activated fairly easily.
 
     Edit ```/etc/openstack-dashboard/local_settings.py``` along the following lines:
 
-    ```OPENSTACK_API_VERSIONS = {
+    ```
+    OPENSTACK_API_VERSIONS = {
      "identity": 3
     }
     OPENSTACK_KEYSTONE_MULTIDOMAIN_SUPPORT = True
-    OPENSTACK_KEYSTONE_URL = "http://x.x.x.x:5000/v3"```
+    OPENSTACK_KEYSTONE_URL = "http://x.x.x.x:5000/v3"
+    ```
 
     The login page will now have an additional ```Domain``` field. Users that already existed in the initial single-domain setup belong to the ```default``` domain, such as the ```admin``` user. The ```admin``` user can now manage domains through the **Identity** windows.
 
