@@ -13,3 +13,5 @@
 6. [OpenStack_identity.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md): Identity management in OpenStack and implications for proc and vmod.
 
 7. [CANFAR_pam.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_pam.md): Using PAM modules to facilitate user access to new VMs.
+
+8. [CANFAR_openstack_ldap_integration.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_openstack_ldap_integration.md): OpenStack integration with LDAP
