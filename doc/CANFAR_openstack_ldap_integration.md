@@ -14,6 +14,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
 
 
 1. **Backups and account/role/tenant IDs**
+
    Before switching over to LDAP for authentication, a backup of the SQL database was made:
    ```
    $ mysqldump --opt --all-databases > openstack.sql
@@ -28,9 +29,11 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
    Also check through ```/etc/[openstack service]/``` to find all of the passwords for the service accounts and the admin user: **admin**, **ceilometer**, **cinder**, **glance**, **neutron**, **nova**, and **swift**.
 
 2. **Add OpenStack service accounts to LDAP**
+
    Add the users mentioned in the previous step to the directory. If the test LDAP server has a lot of users (>1000) it is a good idea to add a common feature to these accounts so that they can be easily filtered. For example, change the last name (sn) to "openstack". Remember to use the same passwords for these admin/service accounts as in the original SQL setup.
 
 3. **Configure LDAP as the authentication backend**
+
    In order to use LDAP for authentication, and the local SQL database for everything else, edit ```/etc/keystone/keystone.conf``` in the following way:
    ```
    [identity]
@@ -63,6 +66,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
    Note that this will be a read-only connection. Also, the attribute named for ```user_name_attribute``` is what a user will use to log in to the dashboard. It would be nice to be able to set ```user_id_attribute``` to something else, like ```nsuniqueid``, but unfortunately there is a [bug in this feature](https://bugs.launchpad.net/keystone/+bug/1361306). This is unfortunate because it would probably have enabled the LDAP server to contain two of the same name, as long as their IDs are different.
 
 4. **Update roles for admin and service users**
+
    Next, restart keystone, and grant the **admin role** to the **admin user** in the **default domain**.
    We bootstrap the system by using the service token. Look up the ```admin_token``` in ```keystone.conf``` and export the following variables:
    ```
@@ -90,6 +94,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
 
 
 5. **Grant admin role to admin user on default domain**
+
    Finally, it's probably a good idea to make the admin account an admin (role) on the entire default domain.
    First, obtain a project-scoped token:
    ```
@@ -126,7 +131,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
        }
    }' | grep ^X-Subject-Token: | awk '{print $2}' )
    ```
-   With this token we add the role to the domain:
+   With this token we add the admin role on the domain:
    ```
    curl -s -X PUT http://localhost:5000/v3/domains/default/users/admin/roles/[...admin role id...] -i -H "X-Auth-Token: $ADMIN_TOKEN"
    ```
