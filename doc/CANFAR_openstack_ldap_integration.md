@@ -2,7 +2,7 @@
 
 In this document we explore the details of integrating LDAP with OpenStack for CANFAR. It builds on concepts described [here](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md).
 
-## Phase I: WestGrid LDAP, UVic Domains
+## Phase I: WestGrid LDAP, UVic Domains/tenants
 
 Initially we will be using an IceHouse OpenStack deployment at UVic. While multi-domain support exists in this release, it has an important limitation: **it is not possible to specify a different identity backend for each domain**. Regardless, having a separate domain for CANFAR users is useful both for practical and conceptual reasons as it should assist with resource accounting, and is a step towards using an LDAP server under our control for the CANFAR domain in the next OpenStack release (Juno).
 
@@ -10,8 +10,7 @@ Initially we will be using an IceHouse OpenStack deployment at UVic. While multi
 
 Presently, UVic uses a read-only LDAP slave from WestGrid to provide user authentication (name, password). Our understanding is that all other relationships and privilieges (e.g., tenants, roles) are stored in the Keystone SQL database local to the cloud.
 
-Using an IceHouse OpenStack distribution installed locally, and our local development LDAP server, we have set up a system which should be at least superficially similar to that at UVic. [This guide](http://www.mattfischer.com/blog/?p=545) was very useful. Also see [this question](https://ask.openstack.org/en/question/47217/how-to-change-user-domain-in-v2-v3-migration-icehouse/).
-
+Using an IceHouse OpenStack distribution installed locally, and our local development LDAP server, we have set up a system which should be at least superficially similar to that at UVic. [This guide](http://www.mattfischer.com/blog/?p=545) was very useful.
 
 1. **Backups and account/role/tenant IDs**
 
@@ -133,12 +132,12 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
    ```
    With this token we add the admin role on the domain:
    ```
-   curl -s -X PUT http://localhost:5000/v3/domains/default/users/admin/roles/[...admin role id...] -i -H "X-Auth-Token: $ADMIN_TOKEN"
+   $ curl -s -X PUT http://localhost:5000/v3/domains/default/users/admin/roles/[...admin role id...] -i -H "X-Auth-Token: $ADMIN_TOKEN"
    ```
    Now we can obtain a domain-scoped token like this:
    ```
-   ADMIN_TOKEN_DOMAIN=$(\
-   curl http://132.246.194.41:5000/v3/auth/tokens \
+   $ ADMIN_TOKEN_DOMAIN=$(\
+   curl http://localhost:5000/v3/auth/tokens \
        -s \
        -i \
        -H "Content-Type: application/json" \
@@ -168,3 +167,59 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
    }' | grep ^X-Subject-Token: | awk '{print $2}' )
    ```
 
+6. **Create a CANFAR domain**
+   ```
+   $ curl -s \
+     -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
+     -H "Content-Type: application/json" \
+     -d '{ "domain": { "description": "CANFAR domain", "name": "canfar2"}}' \
+     http://localhost:5000/v3/domains
+   ```
+   The response will include the domain ID.
+
+### Add user-group relationships to SQL backend
+
+With users now being authenticated successfully in the LDAP backend, we now need to update the local keystone database to include information about CANFAR groups (tenants or projects in OpenStack language) and membership.
+
+The original intention was to create a CANFAR domain, move these users into that domain, create all of the tenants, and then associate users with tenants. As it turns out, when LDAP is used in IceHouse, there is no way to specify which domain a user belongs to, so [default is assumed](https://ask.openstack.org/en/question/47217/how-to-change-user-domain-in-v2-v3-migration-icehouse/).
+
+However, **projects** can be created within domains, and the LDAP users can be associated with those projects. This setup *should* be sufficient for domain-based accounting purposes.
+
+Note that these commands will ultimately be executed by someone at UVic with access to the **$ADMIN_TOKEN_DOMAIN**. See this reference for the full [v3 API](http://developer.openstack.org/api-ref-identity-v3.html).
+
+1. **Create a project**
+
+   ```
+   $ curl -s \
+     -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
+     -H "Content-Type: application/json" \
+     -d '{ "project": { "description": "a canfar group", "domain_id": "8d372ada740a477e856c11fe6e3a4909", "name": "scuba2"}}' \
+     http://localhost:5000/v3/projects
+   ```
+   The reponse includes the new project ID.
+
+2. **Add an existing LDAP user 'echapin' to the project**
+
+   This step is accomplished by granting them the **_member_** role on the project. We may also want to investigate granting the **admin** role for group owners as well.
+
+   ```
+   $ curl -X PUT -s -i \
+     -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
+     http://localhost:5000/v3/projects/[...project ID...]/users/echapin/roles/[...member role id...]
+   ```
+
+Note that these commands are simply updating tables in the mysql database. For example. To connect:
+   ```
+   $ mysql --user=keystone_admin --password=xxxxx keystone
+   ```
+   For the password check ```connection``` in ```keystone.conf```.
+
+   The tables ```domain```, ```project```, and ```assignment``` contain the domains, projects, and roles for users on projects and domains, respectively.
+
+### Domain-based accounting
+
+With this setup, it is possible for an admin to enter 'identity' -> 'domains', and click on the 'set domain context' button next to a given domain. This nominally filters the visible items in the other pages under 'identity'. In practice, it will still display all users in the LDAP server since **domain information is not stored for LDAP users**. However, it will list only the projects that belong in this domain (which is useful).
+
+The **admin** window is used to display, among other things, usage statistics. This will give total and per-project breakdowns, but unfortunately it will not give a domain overview (this appears to be a dashboard shortcoming more than anything else).
+
+Given these limitations, **the benefits of using domains in IceHouse are minimal**. For WestGrid to do accounting, it can find projects in the canfar domain easily enough, and use that to filter the usage statistics on a per-project basis. It is also a good step in the direction we ultimately want to go using a canfar-specific LDAP backend.
