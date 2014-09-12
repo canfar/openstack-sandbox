@@ -10,7 +10,7 @@ Initially we will be using an IceHouse OpenStack deployment at UVic. While multi
 
 Presently, UVic uses a read-only LDAP slave from WestGrid to provide user authentication (name, password). Our understanding is that all other relationships and privilieges (e.g., tenants, roles) are stored in the Keystone SQL database local to the cloud.
 
-Using an IceHouse OpenStack distribution installed locally, and our local development LDAP server, we have set up a system which should be at least superficially similar to that at UVic. [This guide](http://www.mattfischer.com/blog/?p=545) was very useful.
+Using an IceHouse OpenStack distribution installed locally (with multi-domain support enabled), and our local development LDAP server, we have set up a system which should be at least superficially similar to that at UVic. [This guide](http://www.mattfischer.com/blog/?p=545) was very useful.
 
 1. **Backups and account/role/tenant IDs**
 
@@ -18,7 +18,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
    ```
    $ mysqldump --opt --all-databases > openstack.sql
    ```
-   Next, lists of users, roles, and tenants were made (as the admin user) using tje keystone CLI, e.g.,
+   Next, lists of users, roles, and tenants were made (as the admin user) using the keystone CLI, e.g.,
    ```
    $ keystone user-list > userlist.txt
    $ keystone role-list > roles.txt
@@ -29,7 +29,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
 
 2. **Add OpenStack service accounts to LDAP**
 
-   Add the users mentioned in the previous step to the directory. If the test LDAP server has a lot of users (>1000) it is a good idea to add a common feature to these accounts so that they can be easily filtered. For example, change the last name (sn) to "openstack". Remember to use the same passwords for these admin/service accounts as in the original SQL setup.
+   Add the users mentioned in the previous step to the directory. If the test LDAP server has a lot of users (>1000) it is a good idea to add a common feature to these accounts so that they can be easily filtered. For example, change the last name (sn) to "openstack". If filtering is not used, you may see errors related to exceeding maximum numbers of results when querying the directory. Remember to use the same passwords for these admin/service accounts as in the original SQL setup.
 
 3. **Configure LDAP as the authentication backend**
 
@@ -62,7 +62,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
    user_name_attribute=uid
    user_mail_attribute=mail
    ```
-   Note that this will be a read-only connection. Also, the attribute named for ```user_name_attribute``` is what a user will use to log in to the dashboard. It would be nice to be able to set ```user_id_attribute``` to something else, like ```nsuniqueid``, but unfortunately there is a [bug in this feature](https://bugs.launchpad.net/keystone/+bug/1361306). This is unfortunate because it would probably have enabled the LDAP server to contain two of the same name, as long as their IDs are different.
+   Note that this will be a read-only connection. Also, the attribute named for ```user_name_attribute``` is what a user will use to log in to the dashboard. It would be nice to be able to set ```user_id_attribute``` to something else, like ```nsuniqueid```, but unfortunately there is a [bug in this feature](https://bugs.launchpad.net/keystone/+bug/1361306). Otherwise it would have enabled the LDAP server to contain two of the same name, as long as their IDs are different.
 
 4. **Update roles for admin and service users**
 
@@ -89,7 +89,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
       --tenant-id=[...services tenant id...] \
       --role-id=[...ResellerAdmin id...]
    ```
-   If you now connect to a dashboard for a [domain-enabled IceHouse OpenStack cloud](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup), you should now be able to log in with the admin account (specify the **default** domain). It should also be possible to launch VMs etc.
+   If you now connect to a [domain-enabled dashboard](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup) for this cloud, you should be able to log in with the admin account (specify the **default** domain). It should also be possible to launch VMs etc.
 
 
 5. **Grant admin role to admin user on default domain**
@@ -179,7 +179,7 @@ Using an IceHouse OpenStack distribution installed locally, and our local develo
 
 ### Add user-group relationships to SQL backend
 
-With users now being authenticated successfully in the LDAP backend, we now need to update the local keystone database to include information about CANFAR groups (tenants or projects in OpenStack language) and membership.
+With users now being authenticated successfully in the LDAP backend, we need to update the local keystone database to include information about CANFAR groups (tenants or projects in OpenStack language) and membership.
 
 The original intention was to create a CANFAR domain, move these users into that domain, create all of the tenants, and then associate users with tenants. As it turns out, when LDAP is used in IceHouse, there is no way to specify which domain a user belongs to, so [default is assumed](https://ask.openstack.org/en/question/47217/how-to-change-user-domain-in-v2-v3-migration-icehouse/).
 
