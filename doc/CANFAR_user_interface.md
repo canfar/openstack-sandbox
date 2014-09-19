@@ -22,6 +22,12 @@ According to this web page, http://www.metacloud.com/2014/03/17/openstack-horizo
 
 In the short term it will probably suffice to install and customize a local CANFAR horizon dashboard from package repositories. [This page shows](http://docs.openstack.org/icehouse/install-guide/install/apt/content/install_dashboard.html) how to set it up for Ubuntu 12.04/14.04 from repositories.
 
+### Customization
+
+Some basic customization can be used for branding. This [web page](http://docs.openstack.org/admin-guide-cloud/content/dashboard-custom-brand.html) describes the procedure; specifically changing some of the colours, the logo displayed on the spash screen, the logo down at the top-left once logged-in, and the HTML title.
+
+A more detailed description of potential customizations is provided [with the source code](https://github.com/openstack/horizon/blob/master/doc/source/topics/customizing.rst). In addition to things like fonts, icons, and style sheets, a particularly interesting feature is the ability to specify a [Python customization module](https://github.com/openstack/horizon/blob/master/doc/source/topics/customizing.rst). This can be used to perform more fine-grained modifications to panels etc. Perhaps is a viable mechanism for modifying a multi-domain enabled login screen so that the canfar domain is always assumed?
+
 ### Image distribution using Glint
 
 The HEP group at UVic is developing a stand-alone service that extends Horizon with the ability to distribute VM images to a range of external clouds.
