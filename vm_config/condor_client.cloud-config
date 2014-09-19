@@ -16,8 +16,9 @@
 # although this may be dangerous.
 
 packages:
+ - condor
  - htcondor
-
+ - wget
 
 # Pull in the local condor_config.canfar file
 runcmd:
