@@ -1,0 +1,24 @@
+#cloud-config
+
+# According to the following web pages it looks like the package
+# installation is distro-agnostic, so as long as package names are the
+# same, this should work for both Redhat-like and Debian-like systems:
+#
+# http://bazaar.launchpad.net/~cloud-init-dev/cloud-init/trunk/view/head:/doc/examples/cloud-config-install-packages.txt
+# http://cloudinit.readthedocs.org/en/latest/topics/examples.html#install-arbitrary-packages
+#
+# It may also be the case that the native package system will
+# automatically be updated if a package is installed (e.g., run
+# apt-get update). Finally, we could also set
+#
+# package_upgrade: true
+#
+# although this may be dangerous.
+
+packages:
+ - htcondor
+
+
+# Pull in the local condor_config.canfar file
+runcmd:
+ - [ wget, "https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/condor_config.canfar", -O, /etc/condor/config.d/condor_config.canfar ]

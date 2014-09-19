@@ -1,0 +1,80 @@
+# Local config for Cloud Scheduler
+
+##  What machine is your central manager?
+CONDOR_HOST=canfar.dao.nrc.ca
+
+##  Where staging space is mounted
+EXECUTE=/staging/condor
+
+## test to see if I can get job execution running as 
+## not nobody
+#
+UID_DOMAIN=cadc.dao.nrc.ca
+TRUST_UID_DOMAIN=True
+SOFT_UID_DOMAIN=True
+STARTER_ALLOW_RUNAS_OWNER=True
+
+
+## range of ports condor uses - override the upper limit
+#
+HIGHPORT = 49999
+
+ALLOW_WRITE = $(FULL_HOSTNAME), canfar.dao.nrc.ca, 204.174.103.123, 142.104.3.226, canfar2.dao.nrc.ca, 204.174.103.112, 206.12.48.3, breezy.westgrid.ca, 204.174.103.34
+
+## Set this to the name you would like to give your VM
+
+# Remove preemption
+#
+#Disable preemption by machine activity.
+PREEMPT = False
+#Disable preemption by user priority.
+PREEMPTION_REQUIREMENTS = False
+#Disable preemption by machine RANK by ranking all jobs equally.
+RANK = 0
+#Since we are disabling claim preemption, we
+# may as well optimize negotiation for this case:
+NEGOTIATOR_CONSIDER_PREEMPTION = False
+
+# Disable Condor's automatic adjustment of user priorities
+#
+PRIORITY_HALFLIFE = 1.0e100
+
+# Disable benchmarking
+#
+RUNBENCHMARKS = FALSE
+
+# Allocate CPU Count to first slot
+#
+SLOT_TYPE_1 = cpus=100%
+NUM_SLOTS_TYPE_1 = 1
+
+# for repoman
+SUSPEND = False
+WANT_SUSPEND = False
+
+# Allow CCB Communication
+#
+CCB_ADDRESS = $(CONDOR_HOST)
+UPDATE_COLLECTOR_WITH_TCP = True
+
+# The longest a job will be allowed to retire for being being preempted
+# - (2 days)
+MaxJobRetirementTime = 3600 * 24 * 2
+# # Time condor waits for daemons to gracefully shutdown (ie retire - the
+# default is 30 minutes which is where the problem came from) (2days+1
+# hour to be a bit longer than the retirement time)
+SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
+
+
+# Export definition of VMType as a machine attribute
+#
+STARTD_ATTRS = $(STARTD_ATTRS) VMType
+
+
+# Set this to the user id that should be able to run jobs on this VM.
+
+START=(Owner == "none")
+
+# Set this to the name you would like to give your VM.
+VMType="canfar"
+
