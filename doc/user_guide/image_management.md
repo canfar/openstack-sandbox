@@ -79,10 +79,10 @@ Clicking on the **Instance Name** gives further detailed information about the i
 By default, the IP address associated with a VM is internal (not publically accessible). Each project will typically have a small quota of public IPs that are managed through the Access & Security window under the Floating IPs tab. Click on Allocate IP to Project to obtain a number, and then Associate and Disassociate with the running VMs of your choice.
 
 Once a public IP is obtained, you can ssh in. The generic user account into which the supplied SSH key has been injected by cloud-init depends on how the VM has been configured by each Linux distribution. The easiest way to find out is to attempt to connect as the root user, e.g.,
-    ```
-    $ ssh root@10.1.0.224
-    Please login as the user "ubuntu" rather than the user "root".
-    ```
+```
+$ ssh root@10.1.0.224
+Please login as the user "ubuntu" rather than the user "root".
+```
 ### Save a snapshot
 
 To save the current state of the VM (e.g., once a VM is configured and ready for batch processing), switch to the Instances window and click on the Create Snapshot button next to the instance of interest. After selecting a name, it will be stored in the Project tab of the Images window, and available for subsequent instantiation.
