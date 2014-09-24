@@ -58,9 +58,15 @@ To launch an instance of a given image, click on the **Launch** button in the la
 
 * **Access & Security tab:** In order to access the VM, an SSH public key will need to be injected into a user account on the VM. A key can also be uploaded here, if you have not done so already, by clicking on the '+'. You will also require a Security Group which defines, primarily, the ports that are open (you will need to open port 22 for SSH, for example).
 
+* **Post-Creation tab:** If you wish to **install Condor for batch processing**, you can call a CANFAR customization script in this tab. Simply enter the following lines:
+  ```
+  #include https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/condor_client.bash
+  ```
+  The **cloud-init** package will download customization scripts from this URL and execute them. In this case it will install Condor and the CANFAR configuration. It should work with most modern Debian-derived (including Ubunutu) and Redhat-derived (including CentOS) flavours of Linux.
+
 ### Save a snapshot
 
-To save the current state of the VM, switch to the Instances window and click on the Create Snapshot button next to the instance of interest. After selecting a name, it will be stored in the Project tab of the Images window, and available for subsequent instantiation.
+To save the current state of the VM (e.g., once a VM is configured and ready for batch processing), switch to the Instances window and click on the Create Snapshot button next to the instance of interest. After selecting a name, it will be stored in the Project tab of the Images window, and available for subsequent instantiation.
 
 ### Provide image from an external source
 
