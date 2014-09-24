@@ -12,7 +12,6 @@ and user management (e.g., ssh key injection on startup).
 Most modern Linux distributions now provide **cloud images** that are
 ready for use in virtual environments, and handle customization
 tasks with a special package called **cloud-init**. This is the standard method [used by OpenStack](http://docs.openstack.org/grizzly/openstack-compute/admin/content/user-data.html).
-
 CANFAR keeps copies of some popular cloud images in the image
 repository (e.g., Ubuntu and CentOS), although users are free to use
 any image they deem fit for their work. For VM-on-demand (VMOD) in
@@ -64,13 +63,32 @@ To launch an instance of a given image, click on the **Launch** button in the la
   ```
   The **cloud-init** package will download customization scripts from this URL and execute them. In this case it will install Condor and the CANFAR configuration. It should work with most modern Debian-derived (including Ubunutu) and Redhat-derived (including CentOS) flavours of Linux.
 
+### Provide image from an external source
+
+VM images from external sources can be added through the Create button at the top-right of the Images window. A variety of options are available, including providing a URL for an image, or directly uploading it. The image Format is a required option, and the most typical values are Raw (e.g., for a **.iso** cloud image from a Linux distribution), or **QCOW2** (format normally used by OpenStack internally, e.g., for snapshots).
+
+### Check status of instances
+
+The Instances window shows all running instances.
+
+Clicking on the **Instance Name** gives further detailed information about the instance in the Overview tab (how long it has been up, security groups, which image it was instantiated from). The Log tab will show startup information as well as a number of useful details provided by the cloud-init package (helpful for debugging boot/device problems for example). This log will not always have useful information, and sometimes problems are best debugged in the Console tab. This shows an embedded VNC client that is able to show console output for the entire boot process. If a user account (+ password) exists on the VM, it is possible to log in directly through this client, without requiring SSH access. The VNC client can send "Ctrl-Alt-Delete" (button near top of the screen) to attempt to reboot the VM. This is sometimes a convenient feature as it restarts the VM while preserving any changes (e.g., installed / changed files) that may be on it.
+
+### Log into an instance
+
+By default, the IP address associated with a VM is internal (not publically accessible). Each project will typically have a small quota of public IPs that are managed through the Access & Security window under the Floating IPs tab. Click on Allocate IP to Project to obtain a number, and then Associate and Disassociate with the running VMs of your choice.
+
+Once a public IP is obtained, you can ssh in. The generic user account into which the supplied SSH key has been injected by cloud-init depends on how the VM has been configured by each Linux distribution. The easiest way to find out is to attempt to connect as the root user, e.g.,
+    ```
+    $ ssh root@10.1.0.224
+    Please login as the user "ubuntu" rather than the user "root".
+    ```
 ### Save a snapshot
 
 To save the current state of the VM (e.g., once a VM is configured and ready for batch processing), switch to the Instances window and click on the Create Snapshot button next to the instance of interest. After selecting a name, it will be stored in the Project tab of the Images window, and available for subsequent instantiation.
 
-### Provide image from an external source
+### Shut down a VM
 
-VM images from external sources can be added through the Create button at the top-right of the Images window. A variety of options are available, including a URL for the image, and directly uploading it. The image Format is a required option, and the most typical values are Raw (e.g., for a **.iso** cloud image from a Linux distribution), or **QCOW2** (format normally used by OpenStack internally, e.g., for snapshots).
+A VM is shut down by clicking on the check box next to it in the Instances window, and then clicking on the Terminate Instance button at the top-right.
 
 ## Command-line interface
 
