@@ -59,7 +59,8 @@ To launch an instance of a given image, click on the **Launch** button in the la
 
 * **Post-Creation tab:** If you wish to **install Condor for batch processing**, you can call a CANFAR customization script in this tab. Simply enter the following lines:
   ```
-  #include https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/condor_client.bash
+  #include
+  https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/condor_client.bash
   ```
   The **cloud-init** package will download customization scripts from this URL and execute them. In this case it will install Condor and the CANFAR configuration. It should work with most modern Debian-derived (including Ubunutu) and Redhat-derived (including CentOS) flavours of Linux.
 
