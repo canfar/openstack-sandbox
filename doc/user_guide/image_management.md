@@ -73,3 +73,42 @@ To save the current state of the VM (e.g., once a VM is configured and ready for
 VM images from external sources can be added through the Create button at the top-right of the Images window. A variety of options are available, including a URL for the image, and directly uploading it. The image Format is a required option, and the most typical values are Raw (e.g., for a **.iso** cloud image from a Linux distribution), or **QCOW2** (format normally used by OpenStack internally, e.g., for snapshots).
 
 ## Command-line interface
+
+While the full functionality of OpenStack is available through a
+[REST API](http://docs.openstack.org/api/api-ref-guides.html), it is
+generally much simpler to use command-line clients written in
+Python. Until recently, there were a number of different clients
+associated with each service, such as **glance**, **keystone** and
+**nova**.  These clients are usually referenced in guides on the web.
+However, these older clients **do not support multiple domains**. The
+OpenStack project has decided to cease development on these separate
+clients, and instead concentrate on a **single unified openstack
+client**. While not yet widely used, the syntax for this client is
+similar to that of the older, separate clients.
+
+We recommend following [this guide](https://docs.google.com/document/d/1zxnuyi1NoO-Hi52OWpmQZKu4dD3DipvZB-fy91mZ18Q/edit) to get started, but keeping the following in mind:
+
+1. Instead of installing all the separate clients, e.g.,
+   ```
+   $ sudo pip install python-novaclient
+   $ sudo pip install python-cinderclient
+   ...
+   ```
+   install the single new client
+   ```
+   $ sudo sudo pip install python-openstackclient
+   ```
+   **Note:** The client is also hosted in a [GitHub repository](https://github.com/openstack/python-openstackclient)
+
+2. The simplest way to **create an Openrc file** (contains environment variables used by the client to communicate with the OpenStack cloud) is to: (i) log into the dashboard; (ii) navigate to Access & Security, and click on the API Access tab at the top; and (iii) click on the Download OpenStack RC File button. **Note:** The ```OS_TENANT``` variables change depending on the selected project in the dashboard.
+
+3. Generally speaking, service-specific commands from the guide have similar arguments with the new client, although the first argument refers to the general area of functionality. The following table shows some examples of how to translate **old commands** into arguments for the new **single client**
+
+    old                          | new
+    -----------------------------|-------------------------------
+    ```glance index```           | ```openstack image list```
+    ```glance image-create```    | ```openstack image create```
+    ```nova secgroup-create```   | ```openstack security group create```
+    ```nova floating-ip-create```| ```openstack ip floating create```
+    ```nova boot```              | ```openstack server create```
+    ```nova image-create```      | ```openstack snapshot create```
