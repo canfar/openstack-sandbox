@@ -119,7 +119,24 @@ We recommend following [this guide](https://docs.google.com/document/d/1zxnuyi1N
    ```
    **Note:** The client is also hosted in a [GitHub repository](https://github.com/openstack/python-openstackclient)
 
-2. The simplest way to **create an Openrc file** (contains environment variables used by the client to communicate with the OpenStack cloud) is to: (i) log into the dashboard; (ii) navigate to Access & Security, and click on the API Access tab at the top; and (iii) click on the Download OpenStack RC File button. **Note:** The ```OS_TENANT``` variables change depending on the selected project in the dashboard.
+2. An **openrc file** is used to set environment variables for the openstack client.
+
+    Normally one can obtain an openrc file by doing the following: (i) log into the dashboard; (ii) navigate to Access & Security, and click on the API Access tab at the top; and (iii) click on the Download OpenStack RC File button. However, this version of the file may use an **older version of the identity API**. For reference, the following template should give you an idea of the variables that actually need to be set:
+
+    ```
+    export OS_USERNAME=joe_user
+    export OS_PASSWORD=password
+    export OS_USER_DOMAIN_NAME=canfar
+    export OS_PROJECT_DOMAIN_NAME=canfar
+    export OS_AUTH_URL=http://localhost:5000/v3/
+    export OS_PROJECT_ID=0c2af5ec1f904640abd0c49e1547e57d
+    export OS_IDENTITY_API_VERSION=3
+    ```
+    **Notes:**
+        - The older term **tenant** is replaced by **project** in the new API
+        - Change the value of ```OS_PROJECT_ID``` to the ID of the actual project you wish to access
+        - Replace ```localhost``` with the IP address from the dashboard version of the openrc file in ```OS_AUTH_URL```.
+
 
 3. Generally speaking, service-specific commands from the guide have similar arguments with the new client, although the first argument refers to the general area of functionality. The following table shows some examples of how to translate **old commands** into arguments for the new **single client**
 
