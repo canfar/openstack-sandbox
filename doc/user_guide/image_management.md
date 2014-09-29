@@ -134,9 +134,9 @@ We recommend following [this guide](https://docs.google.com/document/d/1zxnuyi1N
     ```
     **Notes:**
     
-        * The older term **tenant** is replaced by **project** in the new API
-        * Change the value of ```OS_PROJECT_ID``` to the ID of the actual project you wish to access
-        * Replace ```localhost``` with the IP address from the dashboard version of the openrc file in ```OS_AUTH_URL```.
+    * The older term **tenant** is replaced by **project** in the new API
+    * Change the value of ```OS_PROJECT_ID``` to the ID of the actual project you wish to access
+    * Replace ```localhost``` with the IP address from the dashboard version of the openrc file in ```OS_AUTH_URL```.
 
 
 3. Generally speaking, service-specific commands from the guide have similar arguments with the new client, although the first argument refers to the general area of functionality. The following table shows some examples of how to translate **old commands** into arguments for the new **single client**
