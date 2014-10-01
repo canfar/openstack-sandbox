@@ -20,7 +20,7 @@ needed for OpenStack, although some CANFAR and CADC services may not be supporte
 
 For batch processing, VMs will require the installation of
 [HTCondor](http://research.cs.wisc.edu/htcondor/) so that running
-instances will be able to consume jobs from the processing queue. A script that may be provided to a VM as **user data** (executed by cloud-init when instantiated) can perform this installation.
+instances will be able to consume jobs from the processing queue. A script that may be provided to a VM as **user data** (executed by cloud-init when instantiated) can perform this installation. It will also be necessary to **share the VM** with the CANFAR batch processing project.
 
 In this guide we will cover several major topics related to the management of VMs:
 
@@ -33,6 +33,8 @@ In this guide we will cover several major topics related to the management of VM
 **Command line interface**
 
 * introduction to the OpenStack command-line client
+
+**Preparing a VM for batch processing project**
 
 ## Using the dashboard
 
@@ -91,11 +93,11 @@ To save the current state of the VM (e.g., once a VM is configured and ready for
 
 A VM is shut down by clicking on the check box next to it in the Instances window, and then clicking on the Terminate Instance button at the top-right.
 
-## Command-line interface
+## Command line interface
 
 While the full functionality of OpenStack is available through a
 [REST API](http://docs.openstack.org/api/api-ref-guides.html), it is
-generally much simpler to use command-line clients written in
+generally much simpler to use command line clients written in
 Python. Until recently, there were a number of different clients
 associated with each service, such as **glance**, **keystone** and
 **nova**.  These clients are usually referenced in guides on the web.
@@ -133,7 +135,7 @@ We recommend following [this guide](https://docs.google.com/document/d/1zxnuyi1N
     export OS_IDENTITY_API_VERSION=3
     ```
     **Notes:**
-    
+
     * The older term **tenant** is replaced by **project** in the new API
     * Change the value of ```OS_PROJECT_ID``` to the ID of the actual project you wish to access
     * Replace ```localhost``` with the IP address from the dashboard version of the openrc file in ```OS_AUTH_URL```.
@@ -149,3 +151,15 @@ We recommend following [this guide](https://docs.google.com/document/d/1zxnuyi1N
     ```nova floating-ip-create```| ```openstack ip floating create```
     ```nova boot```              | ```openstack server create```
     ```nova image-create```      | ```openstack snapshot create```
+
+## Preparing a VM for batch processing
+
+Once a VM has been set up (including the installation of HTCondor mentioned above), and tested interactively, one final step is required before it can be used by the batch processing service. All batch processing is performed on behalf of the user by a special service account in a separate OpenStack project. A user's VM must be **shared** with this project prior to executing ```condor_submit```. Unfortunately, at the time of writing, neither the dashboard, nor the Python openstack client have this capability, so a special script is provided on the CANFAR login host for this purpose.
+
+First, log into the dashboard and switch to the project that contains the image. Under the Images window, click on the Image Name. The Overview tab includes an **ID** field. Take note of its value, and then execute the following command on the login host:
+
+```
+$ vmBatchReady [username] [projectname] [vm_id]
+```
+
+where ```username``` is your CANFAR user name, ```projectname``` is the name of the project where your VM resides, and ```vm_id``` is the value obtained from the dashboard. The script will challenge you for your CANFAR password, and should respond with ```Success``` if it worked.
