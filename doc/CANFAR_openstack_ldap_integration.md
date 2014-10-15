@@ -196,7 +196,7 @@ The original intention was to create a CANFAR domain, move these users into that
 
 However, **projects** can be created within domains, and the LDAP users can be associated with those projects. This setup *should* be sufficient for domain-based accounting purposes.
 
-Note that these commands will ultimately be executed by someone at UVic with access to the **$CANFAR_ADMIN_TOKEN**. See this reference for the full [v3 API](http://developer.openstack.org/api-ref-identity-v3.html).
+These commands are executed by someone with access to the **$CANFAR_ADMIN_TOKEN**. See this reference for the full [v3 API](http://developer.openstack.org/api-ref-identity-v3.html).
 
 1. **Create a project**
 
