@@ -172,7 +172,7 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
    $ curl -s \
      -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
      -H "Content-Type: application/json" \
-     -d '{ "domain": { "description": "CANFAR domain", "name": "canfar2"}}' \
+     -d '{ "domain": { "description": "CANFAR domain", "name": "canfar.net"}}' \
      http://localhost:5000/v3/domains
    ```
    The response will include the domain ID.
