@@ -177,6 +177,16 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
    ```
    The response will include the domain ID.
 
+7. **Create a CANFAR domain admin**
+
+   First ensure that the user ```canfar_admin``` has been added to LDAP. Then grant the admin role on the CANFAR domain:
+   ```
+   $ curl -X PUT http://localhost:5000/v3/domains/${ID_CANFAR_DOMAIN}/users/canfar_admin/roles/${ADMIN_ROLE_ID} \
+    -s \
+    -i \
+    -H "X-Auth-Token: $CLOUD_ADMIN_TOKEN" \
+    -H "Content-Type: application/json"
+   ```
 ### Add user-group relationships to SQL backend
 
 With users now being authenticated successfully in the LDAP backend, we need to update the local keystone database to include information about CANFAR groups (tenants or projects in OpenStack language) and membership.
@@ -185,13 +195,13 @@ The original intention was to create a CANFAR domain, move these users into that
 
 However, **projects** can be created within domains, and the LDAP users can be associated with those projects. This setup *should* be sufficient for domain-based accounting purposes.
 
-Note that these commands will ultimately be executed by someone at UVic with access to the **$ADMIN_TOKEN_DOMAIN**. See this reference for the full [v3 API](http://developer.openstack.org/api-ref-identity-v3.html).
+Note that these commands will ultimately be executed by someone at UVic with access to the **$CANFAR_ADMIN_TOKEN**. See this reference for the full [v3 API](http://developer.openstack.org/api-ref-identity-v3.html).
 
 1. **Create a project**
 
    ```
    $ curl -s \
-     -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
+     -H "X-Auth-Token: $CANFAR_ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{ "project": { "description": "a canfar group", "domain_id": "8d372ada740a477e856c11fe6e3a4909", "name": "scuba2"}}' \
      http://localhost:5000/v3/projects
@@ -204,7 +214,7 @@ Note that these commands will ultimately be executed by someone at UVic with acc
 
    ```
    $ curl -X PUT -s -i \
-     -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
+     -H "X-Auth-Token: $CANFAR_ADMIN_TOKEN" \
      http://localhost:5000/v3/projects/[...project ID...]/users/echapin/roles/[...member role id...]
    ```
 
