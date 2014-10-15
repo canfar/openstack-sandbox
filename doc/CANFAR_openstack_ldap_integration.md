@@ -91,10 +91,15 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
    ```
    If you now connect to a [domain-enabled dashboard](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup) for this cloud, you should be able to log in with the admin account (specify the **default** domain). It should also be possible to launch VMs etc.
 
+5. **Swith to the v3 auth API**
 
-5. **Grant admin role to admin user on default domain**
+   Configure OpenStack services to use the v3 auth API, and then enable the v3 policy file (```policy.v3cloudsample.json```) for keystone. See
+   [this link](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup)
+   for details.
 
-   Finally, it's probably a good idea to make the admin account an admin (role) on the entire default domain.
+6. **Grant admin role to admin user on default domain**
+
+   It's probably a good idea to make the admin account an admin (role) on the entire default domain.
    First, obtain a project-scoped token:
    ```
    $ ADMIN_TOKEN=$(\
@@ -167,7 +172,7 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
    }' | grep ^X-Subject-Token: | awk '{print $2}' )
    ```
 
-6. **Create a CANFAR domain**
+7. **Create a CANFAR domain**
    ```
    $ curl -s \
      -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
@@ -177,7 +182,7 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
    ```
    The response will include the domain ID.
 
-7. **Create a CANFAR domain admin**
+8. **Create a CANFAR domain admin**
 
    First ensure that the user ```canfar_admin``` has been added to LDAP. Then grant the admin role on the CANFAR domain:
    ```
@@ -187,7 +192,7 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
     -H "X-Auth-Token: $CLOUD_ADMIN_TOKEN" \
     -H "Content-Type: application/json"
    ```
-   
+
 ### Add user-group relationships to SQL backend
 
 With users now being authenticated successfully in the LDAP backend, we need to update the local keystone database to include information about CANFAR groups (tenants or projects in OpenStack language) and membership.
