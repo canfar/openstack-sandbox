@@ -187,6 +187,7 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
     -H "X-Auth-Token: $CLOUD_ADMIN_TOKEN" \
     -H "Content-Type: application/json"
    ```
+   
 ### Add user-group relationships to SQL backend
 
 With users now being authenticated successfully in the LDAP backend, we need to update the local keystone database to include information about CANFAR groups (tenants or projects in OpenStack language) and membership.
