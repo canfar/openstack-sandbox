@@ -15,3 +15,5 @@
 7. [CANFAR_pam.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_pam.md): Using PAM modules to facilitate user access to new VMs.
 
 8. [CANFAR_openstack_ldap_integration.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_openstack_ldap_integration.md): OpenStack integration with LDAP
+
+9. [CANFAR_Transition_Plan.md](https://github.com/canfar/openstack-sandbox/blob/master/doc/CANFAR_Transition_Plan.md): Final OpenStack Transition plan of actions
