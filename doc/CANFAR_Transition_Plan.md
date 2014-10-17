@@ -18,11 +18,13 @@ Actions for the OpenStack transition
 
 ## identity
 * define keystone projects and users
+
 ## batch
 * update cloud scheduler with nefos cluster
 * deploy /proc
 * add canfarcs user to every project
 * [if needed] build submission host VM with public IP on nefos
+
 ## VMs
 * translate and upload all users current CANFAR VMs to OpenStack
 * convince Westgrid to get more template VMs before Nov. 30
