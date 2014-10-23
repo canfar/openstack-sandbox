@@ -89,15 +89,8 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
       --tenant-id=[...services tenant id...] \
       --role-id=[...ResellerAdmin id...]
    ```
-   If you now connect to a [domain-enabled dashboard](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup) for this cloud, you should be able to log in with the admin account (specify the **default** domain). It should also be possible to launch VMs etc.
 
-5. **Swith to the v3 auth API**
-
-   Configure OpenStack services to use the v3 auth API, and then enable the v3 policy file (```policy.v3cloudsample.json```) for keystone. See
-   [this link](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup)
-   for details.
-
-6. **Setup admin domain and a cloud admin**
+5. **Setup admin domain and a cloud admin**
 
    [This guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html) describes the process of setting up delegated administrators for each domain. Key to this setup is the creation of a special **cloud admin** user, in an **admin domain**. Only this user, and *not* the default admin, can create new domains. Once this user/domain have been set up, the policy file for keystone is changed, after which the default admin user has no capabilities outside of the default domain.
 
@@ -187,7 +180,12 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
        -H "Content-Type: application/json"
    ```
 
-   Now switch ```/etc/keystone/policy.json``` with ```policy.v3cloudsample.json```, being sure to update ```admin_domain_id``` with the ID of the actual ```admin_domain``` that was just created. Restart keystone.
+6. **Swith to the v3 auth API**
+
+   Configure OpenStack services to use the v3 auth API, and then enable the v3 policy file (```policy.v3cloudsample.json```) for keystone. See
+   [this link](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup) for details. Be sure to update ```admin_domain_id``` with the ID of the actual ```admin_domain``` that was just created. Restart keystone.
+
+   If you now connect to a [domain-enabled dashboard](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup) for this cloud, you should be able to log in with the admin account (specify the **default** domain). It should also be possible to launch VMs etc.
 
 7. **Create the CANFAR domain**
 
