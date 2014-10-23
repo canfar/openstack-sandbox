@@ -189,7 +189,7 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
 
 7. **Create the CANFAR domain**
 
-   Obtain a domain-scoped token for the :
+   Obtain a domain-scoped token for the ```cloud_admin```:
    ```
    $ CLOUD_ADMIN_TOKEN=$(\
    curl http://localhost:5000/v3/auth/tokens \
