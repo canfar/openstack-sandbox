@@ -97,10 +97,11 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
    [this link](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup)
    for details.
 
-6. **Grant admin role to admin user on default domain**
+6. **Setup admin domain and a cloud admin**
 
-   It's probably a good idea to make the admin account an admin (role) on the entire default domain.
-   First, obtain a project-scoped token:
+   [This guide](http://www.florentflament.com/blog/setting-keystone-v3-domains.html) describes the process of setting up delegated administrators for each domain. Key to this setup is the creation of a special **cloud admin** user, in an **admin domain**. Only this user, and *not* the default admin, can create new domains. Once this user/domain have been set up, the policy file for keystone is changed, after which the default admin user has no capabilities outside of the default domain.
+
+   Obtain a default admin token:
    ```
    $ ADMIN_TOKEN=$(\
    curl http://132.246.194.41:5000/v3/auth/tokens \
@@ -135,13 +136,64 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
        }
    }' | grep ^X-Subject-Token: | awk '{print $2}' )
    ```
-   With this token we add the admin role on the domain:
+
+   Create the new ```admin_domain```:
    ```
-   $ curl -s -X PUT http://localhost:5000/v3/domains/default/users/admin/roles/[...admin role id...] -i -H "X-Auth-Token: $ADMIN_TOKEN"
+   ID_ADMIN_DOMAIN=$(\
+   curl http://localhost:5000/v3/domains \
+       -s \
+       -H "X-Auth-Token: $ADMIN_TOKEN" \
+       -H "Content-Type: application/json" \
+       -d '
+   {
+       "domain": {
+       "enabled": true,
+       "name": "admin_domain"
+       }
+   }' | jq .domain.id | tr -d '"' )
    ```
-   Now we can obtain a domain-scoped token like this:
+
+   Create the ```cloud_admin``` user in this domain:
    ```
-   $ ADMIN_TOKEN_DOMAIN=$(\
+   ID_CLOUD_ADMIN=$(\
+   curl http://localhost:5000/v3/users \
+       -s \
+       -H "X-Auth-Token: $ADMIN_TOKEN" \
+       -H "Content-Type: application/json" \
+       -d "
+   {
+       \"user\": {
+           \"description\": \"Cloud administrator\",
+           \"domain_id\": \"$ID_ADMIN_DOMAIN\",
+           \"enabled\": true,
+           \"name\": \"cloud_admin\",
+           \"password\": \"password\"
+       }
+   }" | jq .user.id | tr -d '"' )
+   ```
+
+   Give ```cloud_admin``` the ```admin``` role on the ```admin_domain```:
+   ```
+   ADMIN_ROLE_ID=$(\
+   curl http://localhost:5000/v3/roles?name=admin \
+       -s \
+       -H "X-Auth-Token: $ADMIN_TOKEN" \
+   | jq .roles[0].id | tr -d '"' )
+
+   curl -X PUT http://localhost:5000/v3/domains/${ID_ADMIN_DOMAIN}/users/${ID_CLOUD_ADMIN}/roles/${ADMIN_ROLE_ID} \
+       -s \
+       -i \
+       -H "X-Auth-Token: $ADMIN_TOKEN" \
+       -H "Content-Type: application/json"
+   ```
+
+   Now switch ```/etc/keystone/policy.json``` with ```policy.v3cloudsample.json```, being sure to update ```admin_domain_id``` with the ID of the actual ```admin_domain``` that was just created. Restart keystone.
+
+7. **Create the CANFAR domain**
+
+   Obtain a domain-scoped token for the :
+   ```
+   $ CLOUD_ADMIN_TOKEN=$(\
    curl http://localhost:5000/v3/auth/tokens \
        -s \
        -i \
@@ -156,26 +208,26 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
                "password": {
                    "user": {
                        "domain": {
-                           "name": "Default"
+                           "name": "admin_domain"
                        },
-                       "name": "admin",
-                       "password": "d9745dc79407411c"
+                       "name": "cloud_admin",
+                       "password": "password"
                    }
                }
            },
            "scope": {
                "domain": {
-               "id": "default"
+               "id": "admin_domain"
                }
            }
        }
    }' | grep ^X-Subject-Token: | awk '{print $2}' )
    ```
 
-7. **Create a CANFAR domain**
+   With this token we can create the canfar domain:
    ```
    $ curl -s \
-     -H "X-Auth-Token: $ADMIN_TOKEN_DOMAIN" \
+     -H "X-Auth-Token: $CLOUD_ADMIN_TOKEN" \
      -H "Content-Type: application/json" \
      -d '{ "domain": { "description": "CANFAR domain", "name": "canfar.net"}}' \
      http://localhost:5000/v3/domains
