@@ -180,7 +180,7 @@ Using an IceHouse OpenStack distribution installed locally (with multi-domain su
        -H "Content-Type: application/json"
    ```
 
-6. **Swith to the v3 auth API**
+6. **Switch to the v3 auth API**
 
    Configure OpenStack services to use the v3 auth API, and then enable the v3 policy file (```policy.v3cloudsample.json```) for keystone. See
    [this link](https://github.com/canfar/openstack-sandbox/blob/master/doc/OpenStack_identity.md#basic-setup) for details. Be sure to update ```admin_domain_id``` with the ID of the actual ```admin_domain``` that was just created. Restart keystone.
@@ -281,6 +281,34 @@ Note that these commands are simply updating tables in the mysql database. For e
    For the password check ```connection``` in ```keystone.conf```.
 
    The tables ```domain```, ```project```, and ```assignment``` contain the domains, projects, and roles for users on projects and domains, respectively.
+
+
+### Limiting capabilities of domain administrator
+
+While the above setup enables a domain administrator to manage users, projects, and tenants within their domain, it also grants them more generic administrative capabilities for the other services. For example, both the original "default" domain administrator, ```admin```, and the new ```canfar_admin``` are both capable of modifying **flavors**, and network **aggregates**, which are then visible in all domains. These are functions of **nova**, and inspecting ```/etc/nova/policy.json``` there appear to be three broad classes of rules:
+
+1. **none**
+
+    Actions that are available to everyone, such as listing public flavors.
+
+2. **rule:admin_or_owner**
+
+    Actions involving things like user VMs (e.g., starting, stopping).
+
+3. **rule:admin_api**
+
+    Service configuration actions, such as defining flavors and
+    setting quotas.
+
+It may be desirable to limit this last class of actions to a single administrator, as **nova** does not seem to make any use of domain-scoped tokens. A simple redefinition of ```admin_api``` in ```/etc/nova/policy.json``` has the desired effect:
+
+```
+"admin_api": "is_admin:True and user_id:admin",
+```
+
+This rule will require both the **admin** role, *and* the ```user_id``` must be ```admin```, which is the original administrator of the default domain.
+
+Similar rule changes should also be possible for the other services if needed.
 
 ### Domain-based accounting
 
