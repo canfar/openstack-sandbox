@@ -1,0 +1,11 @@
+#!/bin/bash
+
+OLDPYTHONPATH=$PYTHONPATH
+export PYTHONPATH=$PWD:$OLDPYTHONPATH
+
+echo $PYTHONPATH
+python2.7 -m trace --count -s -m -C cover  \
+    --ignore-dir=/usr/ \
+    test/test_session_launcher.py
+
+export PYTHONPATH=$OLDPYTHONPATH
