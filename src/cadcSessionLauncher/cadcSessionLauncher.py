@@ -79,6 +79,9 @@ import urllib
 from settings import *
 
 # --- globals ---
+
+__version__ = '0.1'
+
 _form = None             # query parameters
 _authenticated = False   # True if authenticated, False if anonymous
 _expiration = None       # session expiry
@@ -88,6 +91,7 @@ def html_terminate_header():
     print
 
 def html_start_body():
+    print '<title>CADC Session Launcher '+__version__+'</title>'
     print '<html><body>'
 
 def html_terminate_body():
