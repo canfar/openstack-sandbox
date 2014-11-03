@@ -20,4 +20,4 @@ To run the unit tests:
 $ ./rununittests
 ```
 
-Line-by-line coverage is output to the cover/ subdirectory.
+Line-by-line coverage will be output to the ```cover/``` subdirectory.
