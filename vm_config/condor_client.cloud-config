@@ -15,11 +15,31 @@
 #
 # although this may be dangerous.
 
-packages:
- - condor
- - htcondor
- - wget
+yum_repos:
+    # The name of the repository
+    htcondor_stable:
+        baseurl: http://research.cs.wisc.edu/htcondor/yum/stable/rhel$releasever
+        enabled: true
+        gpgcheck: false
+        name: HTCondor Stable RPM Repository for Redhat Enterprise Linux $releasever
 
-# Pull in the local condor_config.canfar file
+# For ubuntu-like systems we install the htcondor package here. For Redhat-like
+# the package name is condor. We can't specify both because it will fail and
+# install nothing. Instead we install with yum for Redhat in the runcmd block/
+packages:
+  - htcondor
+
+mounts:
+ - [ ephemeral0, /staging ]
+
+# Some additional condor setup, including the latest config file.
+# yum install is only for redhat-like systems
 runcmd:
+# - [ "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", "install", "htcondor" ]
+ - [ yum, -y, install, wget, condor ]
  - [ wget, "https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/condor_config.canfar", -O, /etc/condor/config.d/condor_config.canfar ]
+ - [ mkdir, "/staging/condor" ]
+ - [ chown, "condor:condor", "/staging/condor" ]
+ - [ mkdir, "/staging/tmp" ]
+ - [ chmod, "ugo+rwxt", "/staging/tmp" ]
+ - [ service, condor, restart ]
