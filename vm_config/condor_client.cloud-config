@@ -28,18 +28,45 @@ yum_repos:
 # install nothing. Instead we install with yum for Redhat in the runcmd block/
 packages:
   - htcondor
-
+  
 mounts:
- - [ ephemeral0, /staging ]
+ - [ ephemeral0, /scratch ]
 
 # Some additional condor setup, including the latest config file.
 # yum install is only for redhat-like systems
 runcmd:
 # - [ "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", "install", "htcondor" ]
  - [ yum, -y, install, wget, condor ]
- - [ wget, "https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/condor_config.canfar", -O, /etc/condor/config.d/condor_config.canfar ]
- - [ mkdir, "/staging/condor" ]
- - [ chown, "condor:condor", "/staging/condor" ]
- - [ mkdir, "/staging/tmp" ]
- - [ chmod, "ugo+rwxt", "/staging/tmp" ]
+ - [ mkdir, "/scratch" ]
+ - [ chown, "condor:condor", "/scratch" ]
+ - [ chmod, "ugo+rwxt", "/scratch" ]
  - [ service, condor, restart ]
+
+write_files:
+  - path: /etc/condor/central_manager
+    content: canfarhead
+    
+  - path: /etc/condor/config.d/cloud_scheduler
+    owner: root:root
+    permissions: '0644'
+    content: |
+  EXECUTE = /scratch
+  CONDOR_HOST = canfarhead
+  HOSTALLOW_WRITE = $(FULL_HOSTNAME), $(CONDOR_HOST), $(IP_ADDRESS)
+  ALLOW_WRITE = $(FULL_HOSTNAME), $(CONDOR_HOST), $(IP_ADDRESS)
+  CCB_ADDRESS = $(CONDOR_HOST)
+  TRUST_UID_DOMAIN = False
+  START = TRUE
+  DAEMON_LIST = MASTER, STARTD
+  MaxJobRetirementTime = 3600 * 24 * 2
+  SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
+  SUSPEND = False
+  CONTINUE = True
+  PREEMPT = False
+  KILL = False
+  STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
+  HIGHPORT = 50000
+  LOWPORT = 40000
+
+
+# need to add script that emulates http://www.canfar.phys.uvic.ca/vospace/nodes/canfar/config/cloud_scheduler.init.d?view=data
