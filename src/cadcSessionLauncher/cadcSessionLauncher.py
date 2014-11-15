@@ -74,7 +74,6 @@ import httplib
 import os
 import subprocess
 import sys
-import urllib
 
 from settings import *
 
@@ -148,11 +147,8 @@ def start_new_session(message=None):
             return
 
         # just came back from the login page so initialize a session using
-        # the token (contents of the CADC_DELEG cookie).
-        # Note: Even though this value will be placed in a cookie in
-        #       VOS calls, it needs to be encoded. For various reasons
-        #       URL encoding is the chosen serializer.
-        token = urllib.quote_plus(_form.getvalue('token'))
+        # the token (contents of HTTP header "X-CADC-DelegationToken").
+        token = _form.getvalue('token')
 
     # We have now authenticated, or this is an anonymous session.
     # Execute the session script. This should display URL to stdout.

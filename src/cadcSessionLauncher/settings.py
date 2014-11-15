@@ -32,7 +32,7 @@ LOGIN_PAGE = 'http://'+_base_url+ \
     urllib.quote_plus('vos://cadc.nrc.ca~vospace/echapin')
 
 # Script for starting sessions. It should have the following properties:
-# 1. optionally takes one argument for the VOS cookie string. If not
+# 1. optionally takes one argument for the VOS token string. If not
 #    supplied assume anonymous session request.
 # 2. upon good exit status (0), a URL for the new session is written to stdout
 # Notes:

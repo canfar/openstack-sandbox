@@ -13,7 +13,7 @@ session_url='http://google.com'
 
 if [ ! -z "$token" ]; then
     # This is where you might perform VOSpace operations (vcp, mountvofs...)
-    # using the --cookie="$token" parameter
+    # using the --token="$token" parameter
 
     # authenticated URL if token supplied
     session_url="http://www.google.com/maps/@48.519248,-123.417835,15z?hl=en"
