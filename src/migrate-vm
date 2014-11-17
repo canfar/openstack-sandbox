@@ -43,17 +43,6 @@ except:
 # where to mount the image in the local filesystem if needed
 guestos='./guestos'
 
-# where to find the vmstore tarball that will be installed
-vmstore='vmstore-0.1.3.tar.gz'
-try:
-    if not os.path.isfile(vmstore):
-        raise Exception("Couldn't locate %s" % (vmstore))
-except:
-    traceback.print_exc(file=sys.stdout)
-    print "--- ERROR: maybe you need to:\n    $ vcp vos:echapin/%s ." \
-        % (vmstore)
-    sys.exit(1)
-
 # do we have kpartx installed?
 try:
     print "+++ Checking for kpartx..."
@@ -260,41 +249,14 @@ try:
         # completion with only a warning.
         subprocess.check_call("chroot %s mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk /boot/%s %s" % (guestos,initrd_name,kernel_version), shell=True)
 
-    # Install new vmstore
-    print "+++ Copy %s into %s/tmp..." % (vmstore,guestos)
-    shutil.copy("%s" % (vmstore), "%s/tmp/" % (guestos))
-
-
-    # easy_install and pip were both failing to install vmstore on
-    # some of the VMs. Following this web page, updating setuptools
-    # fixes the problem:
-    #
-    # http://stackoverflow.com/questions/11425106/python-pip-install-fails-invalid-command-egg-info
-    #
-    # Note that it does not work for SL5, but a working versions seems
-    # to be on those VMs already.
-    if os_type is not 'sl5':
-        print "+++ Upgrade python setuptools"
-        subprocess.check_call("chroot %s pip install --upgrade setuptools" \
-                              % (guestos), shell=True)
-
     if os_type in ['sl5','sl6']:
         install_extlinux = "yum -y install syslinux-extlinux cloud-init"
     else:
         install_extlinux = "apt-get -y install extlinux cloud-init"
 
-    if os_type is 'sl5':
-        install_vmstore = "easy_install-2.6"
-    else:
-        install_vmstore = "easy_install"
-
-    print "+++ Install extlinux (dependency for vmsave) and cloud-init..."
+    print "+++ Install extlinux and cloud-init..."
     subprocess.check_call("chroot %s %s" \
                           % (guestos,install_extlinux), shell=True)
-
-    print "+++ Install %s" % (vmstore)
-    subprocess.check_call("chroot %s %s /tmp/%s" \
-                          % (guestos,install_vmstore,vmstore), shell=True)
 
     # The SL5/Ubuntu 12.04 cloud-init packages are version 0.6.3 which doesn't
     # automatically create the login user for you, so we do that here
@@ -464,59 +426,6 @@ except:
 
 
 # -----------------------------------------------------------------------------
-# Update image metadata
-# -----------------------------------------------------------------------------
-
-try:
-    metadatafile = "/.image.metadata"
-    print "+++ Updating %s" % metadatafile
-    metadata = g.read_file(metadatafile)
-    metadata = re.sub(r'"name"\s*:\s*"[^"]+"', \
-                      r'"name": "%s.img.gz"' \
-                      % outputvmtype, metadata)
-    metadata = re.sub(r'"vmtype"\s*:\s*"[^"]+"', \
-                      r'"vmtype": "%s"' \
-                      % outputvmtype, metadata)
-    print metadata
-    g.write(metadatafile,metadata)
-
-    condorfile = "/etc/condor/condor_config.local"
-    print "+++ Updating %s" % condorfile
-    condordata = g.read_file(condorfile)
-    condordata = re.sub(r'VMType\s*=\s*"[^"]+"', \
-                        r'VMType= "%s"' % outputvmtype, condordata)
-    g.write(condorfile,condordata)
-
-except:
-    traceback.print_exc(file=sys.stdout)
-    print "--- ERROR: Didn't work"
-    sys.exit(1)
-
-
-
-# -----------------------------------------------------------------------------
-# init script for /staging
-# -----------------------------------------------------------------------------
-
-try:
-    print "+++ Updating rc.local to dynamically mount /staging..."
-
-    g.upload("%s/mount_staging" % (script_path),"/etc/init.d/mount_staging")
-    g.chmod(0755,'/etc/init.d/mount_staging')
-
-    if os_type in ['sl5','sl6']:
-        g.upload("%s/rc.local.sl" % (script_path), "/etc/rc.d/rc.local")
-
-    if os_type in ['ub12','ub13']:
-        g.upload("%s/rc.local.ubuntu" % (script_path), "/etc/rc.local")
-
-except:
-    traceback.print_exc(file=sys.stdout)
-    print "--- ERROR: Didn't work"
-    sys.exit(1)
-
-
-# -----------------------------------------------------------------------------
 # *** DOESN'T WORK FOR UBUNTU 12.04 SO TURNING OFF ***
 #
 # Configure newuser in cloud-init for ssh key injection
@@ -548,6 +457,8 @@ except:
 #    print "--- ERROR: Didn't work"
 #    sys.exit(1)
 
-print "DONE"
+print "+++ Shutdown guestfs session"
 g.shutdown()
+
+print "DONE"
 sys.exit(0)
