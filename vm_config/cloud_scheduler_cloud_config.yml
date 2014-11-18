@@ -1,4 +1,7 @@
 #cloud-config
 
 mounts:
- - [ ephemeral0, /staging ]
+  - [ ephemeral0, /ephemeral ]
+
+runcmd:
+  - [ "cloud_scheduler_setup.bash", "--ephemeral-dir", "/ephemeral", "192.168.0.3" ]
