@@ -34,6 +34,7 @@ try:
     inputimage=args.inputimage
     outputvmtype=args.outputvmtype
     outputimage=outputvmtype+'.img'
+    outputimage_final=outputvmtype+'.qcow2'
 
     # Get the location of the script so that we can find the templates
     script_path = os.path.dirname(os.path.realpath(__file__))
@@ -49,6 +50,14 @@ try:
     subprocess.check_call("which kpartx", shell=True)
 except:
     print "--- ERROR: you need to install kpartx"
+    sys.exit(1)
+
+# do we have kpartx installed?
+try:
+    print "+++ Checking for qemu-img..."
+    subprocess.check_call("which qemu-img", shell=True)
+except:
+    print "--- ERROR: you need to install qemu-img"
     sys.exit(1)
 
 
@@ -459,6 +468,23 @@ except:
 
 print "+++ Shutdown guestfs session"
 g.shutdown()
+
+
+
+# -----------------------------------------------------------------------------
+# Convert into older qcow2 image fortmat
+# -----------------------------------------------------------------------------
+
+print "+++ Convert output image to QCOW2"
+try:
+    subprocess.check_call("qemu-img convert -f raw -O qcow2 -o compat=0.10 "+\
+                          outputimage + " " + outputimage_final, shell=True)
+
+    os.remove(outputimage)
+except:
+    traceback.print_exc(file=sys.stdout)
+    print "--- ERROR: Unable to convert image"
+    sys.exit(1)
 
 print "DONE"
 sys.exit(0)
