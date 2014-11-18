@@ -1,0 +1,4 @@
+#cloud-config
+
+mounts:
+ - [ ephemeral0, /staging ]
