@@ -8,7 +8,7 @@ EPHEMERAL_DIR="/ephemeral"
 CS_CENTRAL_MANAGER="batch"
 
 msg() {
-    echo "${EXEC_NAME}: $1"
+    echo " >> ${EXEC_NAME}: $1"
 }
 
 die() {
@@ -31,7 +31,7 @@ Install HTCondor if needed and configure it for cloud-scheduler
 cs_condor_install() {
    condor_version > /dev/null 2>&1 && msg "condor is already installed" && return 0
    # determine os
-   if yum --version >&2 > /dev/null; then
+   if yum --version > /dev/null 2>&1 ; then
        msg "rpm/yum based distribution detected - now identifiying"
        local rh_vers=$(rpm -qa \*-release | grep -Ei "redhat|centos|sl" | cut -d "-" -f3)
        if [[ -n ${rh_vers} ]]; then
@@ -42,36 +42,35 @@ cs_condor_install() {
 	       enabled = 1
 	       baseurl = http://research.cs.wisc.edu/htcondor/yum/stable/rhel${rh_vers}
 	       name = HTCondor Stable RPM Repository for Redhat Enterprise Linux ${rh_vers}
-	   EOF
+	EOF
        else
 	   msg "non-RHEL distribution, assuming condor is in repos"
        fi
        msg "installing condor..."
        yum -y install condor || die "failed to install condor"
-   elif apt-get --version >&2 > /dev/null; then
+   elif apt-get --version > /dev/null 2>&1 ; then
        msg "apt/dpkg distribution detected"
        export DEBIAN_FRONTEND=noninteractive
        local condordeb="deb http://research.cs.wisc.edu/htcondor/debian/stable/ wheezy contrib"
        if [[ -d /etc/apt/sources.list.d ]]; then
-	   echo "${condordeb}" > /etc/apt/sources.list.d/condor
+	   echo "${condordeb}" > /etc/apt/sources.list.d/condor.list
        else
 	   echo "${condordeb}" >> /etc/apt/sources.list
        fi
+       wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add - > /dev/null
        apt-get -y update
        msg "installing htcondor..."
-       if apt-get -y install htcondor ; then
-	   msg "didn't work, now installing condor..."
-	   apt-get -y install condor || die "didn't work either, bye!"
-       fi
+       # htcondor is the name of the package in debian repo, condor is the name in the condor repo
+       apt-get -y install condor || die "condor didn't install properly"
    else
        die "unable to detect distribution type"
    fi
 }
 
 # configure condor for cloud scheduler
-cs_configure_condor() {
+cs_condor_configure() {
     msg "updating condor config"
-    type -P condor_config_val || die "condor does not seem to be installed"
+    type -P condor_config_val > /dev/null || die "condor does not seem to be installed"
     local condorconfig="$(condor_config_val LOCAL_CONFIG_DIR)"
     if [[ -n ${condorconfig} ]]; then
 	mkdir -p ${condorconfig}
@@ -80,7 +79,7 @@ cs_configure_condor() {
 	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
 	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
     fi
-    cat >> ${condorfile} <<-EOF
+    cat >> ${condorconfig} <<-EOF
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
 	EXECUTE = ${EPHEMERAL_DIR}
@@ -101,7 +100,7 @@ cs_configure_condor() {
 	HIGHPORT = 50000
 	LOWPORT = 40000
 	######################################################
-    EOF
+	EOF
     echo "${CS_CENTRAL_MANAGER}" > /etc/condor/central_manager
     chown condor:condor ${EPHEMERAL_DIR}
     chmod ugo+rwxt ${EPHEMERAL_DIR}
@@ -150,6 +149,6 @@ done
 [[ $# -eq 0 ]] && die "missing central manager hostname"
 CS_CENTRAL_MANAGER=$1
 
-cs_install_condor
-cs_configure_condor
+cs_condor_install
+cs_condor_configure
 cs_setup_etc_hosts
