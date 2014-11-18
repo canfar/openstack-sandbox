@@ -15,6 +15,7 @@ import traceback
 import subprocess
 import shutil
 import operator
+import time
 
 # Dictionary of known OS types (keys), and type strings (values) that
 # will be used to pattern match the product name string
@@ -277,7 +278,7 @@ try:
             pass
 
         print "+++ Add new repo and run apt-get update..."
-        subprocess.check_call('chroot %s echo "deb http://research.cs.wisc.edu/htcondor/debian/stable/ wheezy contrib" >> /etc/apt/sources.list' % guestos,
+        subprocess.check_call('chroot %s bash -c "echo deb http://research.cs.wisc.edu/htcondor/debian/stable/ wheezy contrib >> /etc/apt/sources.list"' % guestos,
                               shell=True)
         subprocess.check_call('chroot %s wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | sudo apt-key add -' % guestos,
                               shell=True)
@@ -292,7 +293,7 @@ try:
     if os_type in ['sl5','sl6']:
         install_packages = "yum -y install syslinux-extlinux cloud-init condor"
     else:
-        install_packages = "DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install extlinux cloud-init condor"
+        install_packages = "env DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install extlinux cloud-init condor"
 
     print "+++ Install extlinux, cloud-init, and Condor..."
     subprocess.check_call("chroot %s %s" \
@@ -321,7 +322,8 @@ except:
 
 finally:
     # Now unmount the device and delete the device mapping
-    print "+++ Unmounting the image..."
+    print "+++ Sleep 5 seconds then unmount the image..."
+    time.sleep(5)
     for d in reversed(bind_dirs):
         subprocess.check_call("umount %s/%s" % (guestos, d),
                               shell=True)
