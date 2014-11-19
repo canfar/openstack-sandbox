@@ -292,7 +292,7 @@ try:
             pass
 
         print "+++ Remove /etc/condor..."
-        shutil.rmtree("%s/etc/condor",ignore_errors=True)
+        shutil.rmtree("%s/etc/condor" % guestos, ignore_errors=True)
 
         install_packages = "env DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install cloud-init condor"
 
@@ -302,7 +302,7 @@ try:
 
     else:
         print "+++ Remove /etc/condor..."
-        shutil.rmtree("%s/etc/condor",ignore_errors=True)
+        shutil.rmtree("%s/etc/condor" % guestos, ignore_errors=True)
 
         print "+++ Upgrade condor..."
         subprocess.check_call("chroot %s yum -y update condor" \
