@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shell script to condigure Condor for cloud scheduler
+# Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
 EXEC_VERSION=0.1_beta
@@ -26,6 +26,28 @@ Configure HTCondor for cloud-scheduler on VM execution hosts
   -v, --version             output version information and exit
 "
     exit
+}
+
+# mount ephemeral partition
+cs_mount_ephemeral() {
+    if ! grep -q $EPHEMERAL_DIR /proc/mounts; then
+        echo "Try to mount ephemeral disk at ${EPHEMERAL_DIR}..."
+        mkdir -p $EPHEMERAL_DIR
+        if [ -b /dev/disk/by-label/ephemeral0 ]; then
+            DEVICE=/dev/disk/by-label/ephemeral0
+            mount -o defaults ${DEVICE} ${EPHEMERAL_DIR}
+            if [ "$?" -ne "0" ]; then
+                echo "Failed to mount ${DEVICE} at ${EPHEMERAL_DIR}"
+            fi
+            mkdir ${EPHEMERAL_DIR}/condor
+            chown condor:condor ${EPHEMERAL_DIR}/condor
+            mkdir ${EPHEMERAL_DIR}/tmp
+            chmod ugo+rwxt ${EPHEMERAL_DIR}/tmp
+        else
+            echo "Partition labeled 'ephemeral0' does not exist."
+            echo "${EPHEMERAL_DIR} will not be configured."
+        fi
+    fi
 }
 
 # configure condor for cloud scheduler
@@ -85,7 +107,7 @@ cs_setup_etc_hosts() {
 # Store all options
 OPTS=$(getopt \
     -o c:e:hv \
-    -l central-manager: \	   
+    -l central-manager: \
     -l ephemeral-dir: \
     -l help \
     -l version \
@@ -96,7 +118,7 @@ eval set -- "${OPTS}"
 # Process options
 while true; do
     case "$1" in
-	-c | --central-manager) CENTRAL_MANAGER=${2##=}; shift ;;	
+	-c | --central-manager) CENTRAL_MANAGER=${2##=}; shift ;;
 	-e | --ephemeral-dir) EPHEMERAL_DIR=${2##=}; shift ;;
 	-h | --help) usage ;;
 	-V | --version) echo ${EXEC_VERSION}; exit ;;
@@ -106,5 +128,6 @@ while true; do
     shift
 done
 
+cs_mount_ephemeral
 cs_condor_configure
 cs_setup_etc_hosts
