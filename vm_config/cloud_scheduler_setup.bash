@@ -1,11 +1,11 @@
 #!/bin/bash
-# Shell script for installing and configuring Condor to enable dynamically
+# Shell script to condigure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.1_alpha
+EXEC_VERSION=0.1_beta
 
 EPHEMERAL_DIR="/ephemeral"
-CS_CENTRAL_MANAGER="batch"
+CENTRAL_MANAGER="192.168.0.3"
 
 msg() {
     echo " >> ${EXEC_NAME}: $1"
@@ -17,54 +17,15 @@ die() {
 }
 
 usage() {
-    echo $"Usage: ${EXEC_NAME} [OPTION]... CENTRAL_MANAGER
-Install HTCondor if needed and configure it for cloud-scheduler
+    echo $"Usage: ${EXEC_NAME} [OPTION]
+Configure HTCondor for cloud-scheduler on VM execution hosts
 
+  -c, --central-manager     set the central manager hostname (default: ${CENTRAL_MANAGER})
   -e, --ephemeral-dir       scratch directory where condor will execute jobs (default: ${EPHEMERAL_DIR})
   -h, --help                display help and exit
   -v, --version             output version information and exit
 "
     exit
-}
-
-# install condor for rpm or deb distros
-cs_condor_install() {
-   condor_version > /dev/null 2>&1 && msg "condor is already installed" && return 0
-   # determine os
-   if yum --version > /dev/null 2>&1 ; then
-       msg "rpm/yum based distribution detected - now identifiying"
-       local rh_vers=$(rpm -qa \*-release | grep -Ei "redhat|centos|sl" | cut -d "-" -f3)
-       if [[ -n ${rh_vers} ]]; then
-	   msg "RHEL distribution detected, adding extra repo to install condor"
-	   cat <<-EOF > /etc/yum.repos.d/htcondor_stable_rhel${rh_vers}.repo
-	       [htcondor_stable_rhel${rh_vers}]
-	       gpgcheck = 0
-	       enabled = 1
-	       baseurl = http://research.cs.wisc.edu/htcondor/yum/stable/rhel${rh_vers}
-	       name = HTCondor Stable RPM Repository for Redhat Enterprise Linux ${rh_vers}
-	EOF
-       else
-	   msg "non-RHEL distribution, assuming condor is in repos"
-       fi
-       msg "installing condor..."
-       yum -y install condor || die "failed to install condor"
-   elif apt-get --version > /dev/null 2>&1 ; then
-       msg "apt/dpkg distribution detected"
-       export DEBIAN_FRONTEND=noninteractive
-       local condordeb="deb http://research.cs.wisc.edu/htcondor/debian/stable/ wheezy contrib"
-       if [[ -d /etc/apt/sources.list.d ]]; then
-	   echo "${condordeb}" > /etc/apt/sources.list.d/condor.list
-       else
-	   echo "${condordeb}" >> /etc/apt/sources.list
-       fi
-       wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add - > /dev/null
-       apt-get -y update
-       msg "installing htcondor..."
-       # htcondor is the name of the package in debian repo, condor is the name in the condor repo
-       apt-get -y install condor || die "condor didn't install properly"
-   else
-       die "unable to detect distribution type"
-   fi
 }
 
 # configure condor for cloud scheduler
@@ -83,11 +44,10 @@ cs_condor_configure() {
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
 	EXECUTE = ${EPHEMERAL_DIR}
-	CONDOR_HOST = ${CS_CENTRAL_MANAGER}
+	CONDOR_HOST = ${CENTRAL_MANAGER}
 	HOSTALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
 	ALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
 	CCB_ADDRESS = \$(CONDOR_HOST)
-	TRUST_UID_DOMAIN = False
 	START = TRUE
 	DAEMON_LIST = MASTER, STARTD
 	MaxJobRetirementTime = 3600 * 24 * 2
@@ -99,9 +59,10 @@ cs_condor_configure() {
 	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
 	HIGHPORT = 50000
 	LOWPORT = 40000
+	RUNBENCHMARKS = False
 	######################################################
 	EOF
-    echo "${CS_CENTRAL_MANAGER}" > /etc/condor/central_manager
+    echo "${CENTRAL_MANAGER}" > /etc/condor/central_manager
     chown condor:condor ${EPHEMERAL_DIR}
     chmod ugo+rwxt ${EPHEMERAL_DIR}
     msg "restart condor services to include configuration changes"
@@ -121,11 +82,10 @@ cs_setup_etc_hosts() {
     fi
 }
 
-[[ $# -eq 0 ]] && usage
-
 # Store all options
 OPTS=$(getopt \
-    -o e:hv \
+    -o c:e:hv \
+    -l central-manager: \	   
     -l ephemeral-dir: \
     -l help \
     -l version \
@@ -136,6 +96,7 @@ eval set -- "${OPTS}"
 # Process options
 while true; do
     case "$1" in
+	-c | --central-manager) CENTRAL_MANAGER=${2##=}; shift ;;	
 	-e | --ephemeral-dir) EPHEMERAL_DIR=${2##=}; shift ;;
 	-h | --help) usage ;;
 	-V | --version) echo ${EXEC_VERSION}; exit ;;
@@ -145,10 +106,5 @@ while true; do
     shift
 done
 
-# Main argument
-[[ $# -eq 0 ]] && die "missing central manager hostname"
-CS_CENTRAL_MANAGER=$1
-
-cs_condor_install
 cs_condor_configure
 cs_setup_etc_hosts
