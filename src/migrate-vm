@@ -283,7 +283,7 @@ try:
         except:
             pass
 
-        "+++ Remove /etc/condor..."
+        print "+++ Remove /etc/condor..."
         try:
             subprocess.check_call("chroot %s rm -rf /etc/condor" \
                                   % guestos, shell=True)
@@ -297,6 +297,13 @@ try:
                               % (guestos,install_packages), shell=True)
 
     else:
+        print "+++ Remove /etc/condor..."
+        try:
+            subprocess.check_call("chroot %s rm -rf /etc/condor" \
+                                  % guestos, shell=True)
+        except:
+            pass
+
         print "+++ Upgrade condor..."
         subprocess.check_call("chroot %s yum -y update condor" \
                               % guestos, shell=True)
