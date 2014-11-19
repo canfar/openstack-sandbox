@@ -259,17 +259,11 @@ try:
         # completion with only a warning.
         subprocess.check_call("chroot %s mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk /boot/%s %s" % (guestos,initrd_name,kernel_version), shell=True)
 
-    # Remove old Condor, set up repos
+    # Update packages
     if os_type in ['ub12','ub13']:
         print "+++ Wipe old Condor..."
         subprocess.check_call("chroot %s apt-get -y remove --purge condor" \
                               % guestos, shell=True)
-
-        try:
-            subprocess.check_call("chroot %s rm -rf /etc/condor" \
-                                  % guestos, shell=True)
-        except:
-            pass
 
         try:
             subprocess.check_call("chroot %s apt-get update" \
@@ -277,7 +271,7 @@ try:
         except:
             pass
 
-        print "+++ Add new repo and run apt-get update..."
+        print "+++ Add new apt repo and run apt-get update..."
         subprocess.check_call('chroot %s bash -c "echo deb http://research.cs.wisc.edu/htcondor/debian/stable/ wheezy contrib >> /etc/apt/sources.list"' % guestos,
                               shell=True)
         subprocess.check_call('chroot %s wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | sudo apt-key add -' % guestos,
@@ -289,15 +283,29 @@ try:
         except:
             pass
 
+        "+++ Remove /etc/condor..."
+        try:
+            subprocess.check_call("chroot %s rm -rf /etc/condor" \
+                                  % guestos, shell=True)
+        except:
+            pass
 
-    if os_type in ['sl5','sl6']:
-        install_packages = "yum -y install syslinux-extlinux cloud-init condor"
+        install_packages = "env DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install cloud-init condor"
+
+        print "+++ Install cloud-init, and new Condor..."
+        subprocess.check_call("chroot %s %s" \
+                              % (guestos,install_packages), shell=True)
+
     else:
-        install_packages = "env DEBIAN_FRONTEND=noninteractive apt-get -y --force-yes install extlinux cloud-init condor"
+        print "+++ Upgrade condor..."
+        subprocess.check_call("chroot %s yum -y update condor" \
+                              % guestos, shell=True)
 
-    print "+++ Install extlinux, cloud-init, and Condor..."
-    subprocess.check_call("chroot %s %s" \
-                          % (guestos,install_packages), shell=True)
+        print "+++ Install cloud-init..."
+        install_packages = "yum -y install cloud-init"
+        subprocess.check_call("chroot %s %s" \
+                              % (guestos,install_packages), shell=True)
+
 
     # The SL5/Ubuntu 12.04 cloud-init packages are version 0.6.3 which doesn't
     # automatically create the login user for you, so we do that here
@@ -473,9 +481,9 @@ except:
 
 try:
     if os_type in ['sl5','sl6']:
-        print "+++ Adding NOZEROCONF=yes to /etc/sysconfig/network..."
-
-        network = g.read_lines('/etc/fstab')
+        fname = '/etc/sysconfig/network'
+        print "+++ Adding NOZEROCONF=yes to %s..." % fname
+        network = g.read_lines(fname)
         network_new = []
         for line in network:
             # Copy over lines that don't contain NOZEROCONF (in case =no)
@@ -484,7 +492,7 @@ try:
 
         # Add in the new line and write to disk
         network_new.append('NOZEROCONF=yes')
-        g.write('/etc/sysconfig/network',"\n".join(network_new))
+        g.write(fname,"\n".join(network_new))
 
 except:
     traceback.print_exc(file=sys.stdout)
@@ -522,6 +530,12 @@ except:
 #    traceback.print_exc(file=sys.stdout)
 #    print "--- ERROR: Didn't work"
 #    sys.exit(1)
+
+
+
+# -----------------------------------------------------------------------------
+# End guestfs session
+# -----------------------------------------------------------------------------
 
 print "+++ Shutdown guestfs session"
 g.shutdown()
