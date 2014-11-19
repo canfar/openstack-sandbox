@@ -32,11 +32,11 @@ condor_install() {
        if [[ -n ${rh_vers} ]]; then
 	   msg "RHEL distribution detected, adding extra repo to install condor"
 	   cat <<-EOF > /etc/yum.repos.d/htcondor_stable_rhel${rh_vers}.repo
-	       [htcondor_stable_rhel${rh_vers}]
-	       gpgcheck = 0
-	       enabled = 1
-	       baseurl = http://research.cs.wisc.edu/htcondor/yum/stable/rhel${rh_vers}
-	       name = HTCondor Stable RPM Repository for Redhat Enterprise Linux ${rh_vers}
+	[htcondor_stable_rhel${rh_vers}]
+	gpgcheck = 0
+	enabled = 1
+	baseurl = http://research.cs.wisc.edu/htcondor/yum/stable/rhel${rh_vers}
+	name = HTCondor Stable RPM Repository for Redhat Enterprise Linux ${rh_vers}
 	EOF
        else
 	   msg "non-RHEL distribution, assuming condor is in repos"
