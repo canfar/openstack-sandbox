@@ -16,9 +16,6 @@ import subprocess
 import shutil
 import operator
 import time
-import stat
-
-CS_CENTRAL_MANAGER='192.168.0.3'
 
 # Dictionary of known OS types (keys), and type strings (values) that
 # will be used to pattern match the product name string
@@ -65,14 +62,14 @@ except:
     sys.exit(1)
 
 # get the latest cloud scheduler config
-cs_config = 'cloud_scheduler_setup.bash'
-try:
-    print "+++ Getting the latest %s..." % cs_config
-    subprocess.check_call("wget https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/%s" % cs_config, shell=True)
-    os.chmod(cs_config,stat.S_IRWXU|stat.S_IRWXG|stat.S_IRWXO)
-except:
-    print "--- ERROR: Didn't work"
-    sys.exit(1)
+#cs_config = 'cloud_scheduler_setup.bash'
+#try:
+#    print "+++ Getting the latest %s..." % cs_config
+#    subprocess.check_call("wget https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/%s" % cs_config, shell=True)
+#    os.chmod(cs_config,stat.S_IRWXU|stat.S_IRWXG|stat.S_IRWXO)
+#except:
+#    print "--- ERROR: Didn't work"
+#    sys.exit(1)
 
 # -----------------------------------------------------------------------------
 # Initial setup of output image, start guestfs, check dependencies
@@ -332,13 +329,6 @@ try:
             % (newuser)
         subprocess.check_call("chroot %s adduser --disabled-password --gecos '' %s" \
                               % (guestos,newuser), shell=True)
-
-    # Configure CS
-    print "+++ Configure cloud scheduler..."
-    shutil.copy(cs_config,"%s/tmp/" % guestos)
-    subprocess.check_call("chroot %s /tmp/%s %s" \
-                              % (guestos,cs_config,CS_CENTRAL_MANAGER),
-                          shell=True)
 
 except:
     traceback.print_exc(file=sys.stdout)
