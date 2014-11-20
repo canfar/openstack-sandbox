@@ -267,8 +267,14 @@ try:
         # completion with only a warning.
         subprocess.check_call("chroot %s mkinitrd -f --with=virtio_blk --with=virtio_pci --builtin=xenblk /boot/%s %s" % (guestos,initrd_name,kernel_version), shell=True)
 
-    # Update packages
+    # Update packages / remove old cloud_scheduler init script
     if os_type in ['ub12','ub13']:
+        print "+++ Remove old cloud_scheduler init script..."
+        subprocess.check_call("chroot %s update-rc.d -f cloud_scheduler remove"\
+                              % guestos, shell=True)
+        shutil.rmtree("%s/etc/init.d/cloud_scheduler" % guestos,
+                      ignore_errors=True)
+
         print "+++ Wipe old Condor..."
         subprocess.check_call("chroot %s apt-get -y remove --purge condor" \
                               % guestos, shell=True)
@@ -301,6 +307,12 @@ try:
                               % (guestos,install_packages), shell=True)
 
     else:
+        print "+++ Remove old cloud_scheduler init script..."
+        subprocess.check_call("chroot %s /sbin/chkconfig --del cloud_scheduler"\
+                              % guestos, shell=True)
+        shutil.rmtree("%s/etc/rc.d/init.d/cloud_scheduler" % guestos,
+                      ignore_errors=True)
+
         print "+++ Remove /etc/condor..."
         shutil.rmtree("%s/etc/condor" % guestos, ignore_errors=True)
 
