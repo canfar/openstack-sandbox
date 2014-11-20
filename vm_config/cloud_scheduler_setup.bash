@@ -6,7 +6,9 @@ EXEC_VERSION=0.1_beta
 
 EPHEMERAL_DIR="/ephemeral"
 EPHEMERAL_DEVICE="/dev/disk/by-label/ephemeral0"
-CENTRAL_MANAGER="192.168.0.3"
+CM_HOST_NAME="batch.canfar.net"
+# need to specify local ip because no local dns on nefos
+CM_HOST_IP="192.168.0.3"
 
 msg() {
     echo " >> ${EXEC_NAME}: $1"
@@ -21,7 +23,8 @@ usage() {
     echo $"Usage: ${EXEC_NAME} [OPTION]
 Configure HTCondor for cloud-scheduler on VM execution hosts
 
-  -c, --central-manager     set the central manager hostname (default: ${CENTRAL_MANAGER})
+  -c, --central-manager     set the central manager hostname (default: ${CM_HOST_NAME})
+  -i, --central-manager-ip  set the central manager local IP (default: ${CM_HOST_IP})
   -e, --ephemeral-dir       scratch directory where condor will execute jobs (default: ${EPHEMERAL_DIR})
   -h, --help                display help and exit
   -v, --version             output version information and exit
@@ -60,7 +63,7 @@ cs_condor_configure() {
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
 	EXECUTE = ${EPHEMERAL_DIR}
-	CONDOR_HOST = ${CENTRAL_MANAGER}
+	CONDOR_HOST = ${CM_HOST_NAME}
 	HOSTALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
 	ALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
 	CCB_ADDRESS = \$(CONDOR_HOST)
@@ -82,7 +85,7 @@ cs_condor_configure() {
 	STARTER_ALLOW_RUNAS_OWNER = TRUE
 	######################################################
 	EOF
-    echo "${CENTRAL_MANAGER}" > /etc/condor/central_manager
+    echo "${CM_HOST_NAME}" > /etc/condor/central_manager
     chown condor:condor ${EPHEMERAL_DIR}
     chmod ugo+rwxt ${EPHEMERAL_DIR}
     msg "restart condor services to include configuration changes"
@@ -100,12 +103,19 @@ cs_setup_etc_hosts() {
     else
 	echo >> /etc/hosts "${ip} ${HOSTNAME} ${addstr}"
     fi
+    addstr="# Added for condor to specify central manager of local network"
+    if grep -q "${addstr}" /etc/hosts ; then
+	sed -i -e "s:.*\(${addr}\):${CM_HOST_IP} ${CM_HOST_NAME} \1:" /etc/hosts
+    else
+	echo >> /etc/hosts "${CM_HOST_IP} ${CENTAL_MANAGER} ${addstr}"
+    fi
 }
 
 # Store all options
 OPTS=$(getopt \
-    -o c:e:hv \
+    -o c:e:i:hv \
     -l central-manager: \
+    -l central-manager-ip: \
     -l ephemeral-dir: \
     -l help \
     -l version \
@@ -116,7 +126,8 @@ eval set -- "${OPTS}"
 # Process options
 while true; do
     case "$1" in
-	-c | --central-manager) CENTRAL_MANAGER=${2##=}; shift ;;
+	-c | --central-manager) CM_HOST_NAME=${2##=}; shift ;;
+	-i | --central-manager-ip) CM_HOST_IP=${2##=}; shift ;;
 	-e | --ephemeral-dir) EPHEMERAL_DIR=${2##=}; shift ;;
 	-h | --help) usage ;;
 	-V | --version) echo ${EXEC_VERSION}; exit ;;
