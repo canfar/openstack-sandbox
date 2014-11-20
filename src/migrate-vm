@@ -185,7 +185,12 @@ try:
 
     # If the input image had the label it will be propagated, but we
     # explicitly set it again here just in case
+    print "+++ Label partition as '/'..."
     g.set_e2label('/dev/sdb1','/')
+
+    # disable filesystem checks
+    print "+++ Disable filesystem checks..."
+    g.tune2fs('/dev/sdb1', maxmountcount=0, intervalbetweenchecks=0)
 except:
     traceback.print_exc(file=sys.stdout)
     print "--- ERROR: Couldn't copy to %s. Perhaps it is too small?" % \
