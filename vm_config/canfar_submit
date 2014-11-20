@@ -61,12 +61,12 @@ try:
     except:
         raise Exception("Error reading the contents of "+jobfile)
 
-    match_imagename = re.findall('\+VMAMI\s*=\s*\"(.*?)\"',jobfile_data,
+    match_imagename = re.findall('\+VMAMI\s*=\s*\".*?:(.*?)\"',jobfile_data,
                                  re.DOTALL)
     if match_imagename:
         imagename = match_imagename[0]
     else:
-        raise Exception("Couldn't find '+VMAMI=<image name>' in jobfile.")
+        raise Exception("Couldn't find '+VMAMI="+'"'+"<cloud name>:<image name>"+'" in jobfile.')
 
     # Get a list of tenants that the user belongs to. We need to use the
     # rest API directly because this function does not seem to be exposed
@@ -83,7 +83,7 @@ try:
     tenant_data = r.json()
 
     # Loop over tenants and search for the requested image name
-    print "Sharing VM image with batch tennant..."
+    print "Sharing VM image '%s' with batch tennant..." % imagename
     matches = []
     glance_endpoint = ''
     for tenant in tenant_data['tenants']:
