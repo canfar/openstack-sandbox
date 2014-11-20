@@ -5,6 +5,7 @@ EXEC_NAME=$(basename $0 .${0##*.})
 EXEC_VERSION=0.1_beta
 
 EPHEMERAL_DIR="/ephemeral"
+EPHEMERAL_DEVICE="/dev/disk/by-label/ephemeral0"
 CENTRAL_MANAGER="192.168.0.3"
 
 msg() {
@@ -29,24 +30,17 @@ Configure HTCondor for cloud-scheduler on VM execution hosts
 }
 
 # mount ephemeral partition
+# would need something more portable than /proc grepping
 cs_mount_ephemeral() {
-    if ! grep -q $EPHEMERAL_DIR /proc/mounts; then
-        echo "Try to mount ephemeral disk at ${EPHEMERAL_DIR}..."
-        mkdir -p $EPHEMERAL_DIR
-        if [ -b /dev/disk/by-label/ephemeral0 ]; then
-            DEVICE=/dev/disk/by-label/ephemeral0
-            mount -o defaults ${DEVICE} ${EPHEMERAL_DIR}
-            if [ "$?" -ne "0" ]; then
-                echo "Failed to mount ${DEVICE} at ${EPHEMERAL_DIR}"
-            fi
-            mkdir ${EPHEMERAL_DIR}/condor
-            chown condor:condor ${EPHEMERAL_DIR}/condor
-            mkdir ${EPHEMERAL_DIR}/tmp
-            chmod ugo+rwxt ${EPHEMERAL_DIR}/tmp
-        else
-            echo "Partition labeled 'ephemeral0' does not exist."
-            echo "${EPHEMERAL_DIR} will not be configured."
-        fi
+    grep -q ${EPHEMERAL_DIR} /proc/mounts && msg "scratch already directory mounted" && return 0
+    msg "mounting ephemeral disk on ${EPHEMERAL_DIR}"
+    mkdir -p ${EPHEMERAL_DIR}
+    if [[ -b ${EPHEMERAL_DEVICE} ]]; then
+        mount -o defaults ${EPHEMERAL_DEVICE} ${EPHEMERAL_DIR} \
+	    || die "failed to mount ${EPHEMERAL_DEVICE} at ${EPHEMERAL_DIR}"
+    else
+        msg "partition labeled 'ephemeral0' does not exist."
+        msg "${EPHEMERAL_DIR} will not be configured."
     fi
 }
 
@@ -70,18 +64,22 @@ cs_condor_configure() {
 	HOSTALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
 	ALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
 	CCB_ADDRESS = \$(CONDOR_HOST)
-	START = TRUE
 	DAEMON_LIST = MASTER, STARTD
 	MaxJobRetirementTime = 3600 * 24 * 2
 	SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
-	SUSPEND = False
-	CONTINUE = True
-	PREEMPT = False
-	KILL = False
+	START = TRUE
+	SUSPEND = FALSE
+	CONTINUE = TRUE
+	PREEMPT = FALSE
+	KILL = FALSE
 	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
 	HIGHPORT = 50000
 	LOWPORT = 40000
-	RUNBENCHMARKS = False
+	RUNBENCHMARKS = FALSE
+	UID_DOMAIN = canfar.net
+	TRUST_UID_DOMAIN = TRUE
+	SOFT_UID_DOMAIN = TRUE
+	STARTER_ALLOW_RUNAS_OWNER = TRUE
 	######################################################
 	EOF
     echo "${CENTRAL_MANAGER}" > /etc/condor/central_manager
