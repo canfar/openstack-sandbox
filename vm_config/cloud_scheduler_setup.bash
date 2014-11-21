@@ -2,7 +2,7 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.1_beta
+EXEC_VERSION=0.1_rc
 
 EPHEMERAL_DIR="/ephemeral"
 
@@ -168,10 +168,10 @@ while true; do
     shift
 done
 
-export PATH=/sbin:/usr/sbin:${PATH}
+export PATH="/sbin:/usr/sbin:${PATH}"
 
 condor_install
-if [ $UPDATE_CS == true ]; then
+if [[ ${UPDATE_CS} == true ]]; then
     cs_condor_configure
     cs_setup_etc_hosts
 fi

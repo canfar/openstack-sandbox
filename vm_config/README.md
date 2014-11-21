@@ -18,4 +18,7 @@ When a user launches a job, their VM will need to be **shared** with the batch p
 
 ## Cloud Scheduler
 
-The cloud scheduler configuration may be updated dynamically by injecting a configuration script into the VM. We use a **cloud-config** script as it provides a clean mechanism for mounting ephemeral partitions, and it also wraps the ```cloud_scheduler_setup.bash``` (although now providing the ```--update-cloud-scheduler``` option to set, among other things, the central manager). The cloud-config script itself is a YAML file, and is not explicitly included in this repo. Instead, it is generated from ```cloud_scheduler_setup.bash``` by running ```make_cloud_config```, which produces ```cloud_config.yml```. It is this last file which should be supplied for ```VMAMIData``` in the job submission file.
+The cloud scheduler configuration may be updated dynamically by injecting a configuration script into the VM. We use a **cloud-config** script as it provides a clean mechanism for mounting ephemeral partitions, and it also wraps the ```cloud_scheduler_setup.bash``` (although now providing the ```--update-cloud-scheduler``` option to set, among other things, the central manager). The cloud-config script itself is a YAML file, and is not explicitly included in this repo. Instead, it is generated from ```cloud_scheduler_setup.bash``` by running ```make_cloud_config```, which produces ```cloud_config.yml```. It is this last file which should be supplied for ```VMAMIConfig``` in the job submission file:
+```
++VAMIConfig = 'https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/cloud_config.yml'
+```
