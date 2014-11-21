@@ -147,7 +147,7 @@ cs_setup_etc_hosts() {
     if grep -q "${addstr}" /etc/hosts ; then
 	sed -i -e "s:.*\(${addr}\):${CM_HOST_IP} ${CM_HOST_NAME} \1:" /etc/hosts
     else
-	echo >> /etc/hosts "${CM_HOST_IP} ${CENTAL_MANAGER} ${addstr}"
+	echo >> /etc/hosts "${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}"
     fi
 }
 
