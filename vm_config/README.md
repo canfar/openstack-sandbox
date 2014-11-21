@@ -1,4 +1,4 @@
-# CANFAR Migration to OpenStack - batch jobs with VMs
+# CANFAR Migration to OpenStack - configure VMs for batch
 
 This directory contains scripts relevant to the configuration of user
 VMs for use with Cloud Scheduler, and job submission.

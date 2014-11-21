@@ -27,12 +27,12 @@ start_text = '''#cloud-config
 # Normally wouldn't bother with arguments beyond /ephemeral,
 # but defaults didn't work with SL5
 mounts:
-  - [ ephemeral0, /ephemeral, auto, defaults, 0, 0 ]
+  - [ ephemeral0, %s, auto, defaults, 0, 0 ]
 
 runcmd:
   - |
       cat - > /tmp/%s <<'EOF'
-''' % script
+''' % (ephemeral_dir,script)
 
 end_text = '''
       EOF
