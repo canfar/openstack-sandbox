@@ -113,6 +113,7 @@ cs_condor_configure() {
 	######################################################
 	EOF
     echo "${CM_HOST_NAME}" > /etc/condor/central_manager
+    [[ -d ${EPHEMERAL_DIR} ]] || mkdir -p ${EPHEMERAL_DIR}
     chown condor:condor ${EPHEMERAL_DIR}
     chmod ugo+rwxt ${EPHEMERAL_DIR}
     msg "restart condor services to include configuration changes"
