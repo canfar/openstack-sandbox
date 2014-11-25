@@ -173,6 +173,6 @@ export PATH="/sbin:/usr/sbin:${PATH}"
 
 condor_install
 if [[ ${UPDATE_CS} == true ]]; then
-    cs_condor_configure
-    cs_setup_etc_hosts
+   cs_setup_etc_hosts
+   cs_condor_configure
 fi
