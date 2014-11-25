@@ -6,7 +6,7 @@ EXEC_VERSION=0.1_rc
 
 EPHEMERAL_DIR="/ephemeral"
 
-CM_HOST_NAME="batch"
+CM_HOST_NAME="batch.canfar.net"
 
 # need to specify local ip because no local dns on nefos
 CM_HOST_IP="192.168.0.3"
