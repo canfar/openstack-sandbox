@@ -313,8 +313,11 @@ try:
 
     else:
         print "+++ Remove old cloud_scheduler init script..."
-        subprocess.check_call("chroot %s /sbin/chkconfig --del cloud_scheduler"\
-                              % guestos, shell=True)
+        try:
+            subprocess.check_call("chroot %s /sbin/chkconfig --del cloud_scheduler"\
+                                  % guestos, shell=True)
+        except:
+            print "+++ ...init script could not be removed. Continuing anyways.",
         shutil.rmtree("%s/etc/rc.d/init.d/cloud_scheduler" % guestos,
                       ignore_errors=True)
 
