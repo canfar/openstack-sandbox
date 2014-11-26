@@ -85,9 +85,9 @@ cs_condor_configure() {
 	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
 	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
     fi
-#	START = ( Owner == "${CONDOR_SUBMITTER}" )
-#	VMType = ${CS_VMTYPE}
-    cat >> ${condorconfig} <<-EOF
+#	START = ( Owner == "${HOSTNAME#}" ) parse for username
+#	VMType = ${CS_VMTYPE} parse for vmtype
+    cat > ${condorconfig} <<-EOF
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
 	EXECUTE = ${EPHEMERAL_DIR}
@@ -109,6 +109,7 @@ cs_condor_configure() {
 	TRUST_UID_DOMAIN = TRUE
 	SOFT_UID_DOMAIN = TRUE
 	STARTER_ALLOW_RUNAS_OWNER = TRUE
+	UPDATE_COLLECTOR_WITH_TCP = TRUE
 	######################################################
 	EOF
     echo "${CM_HOST_NAME}" > /etc/condor/central_manager
