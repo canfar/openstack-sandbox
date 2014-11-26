@@ -99,8 +99,15 @@ runcmd:
       	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
       	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
           fi
-      #	START = ( Owner == "${HOSTNAME#}" ) parse for username
-      #	VMType = ${CS_VMTYPE} parse for vmtype
+          # hack because of bug cloud scheduler does not update VMType and START anymore
+          # guess info from subname to match requirements
+          # vmtype can have '-' in the name but assume cloud name and user don't
+          local uuid=${HOSTNAME:((${#HOSTNAME} - 36))}
+          local name=${HOSTNAME%-${uuid}}
+          local cloud=${name%%-*}
+          name=${name#${cloud}-}
+          local submitter=${name%%-*}
+          local vmtype=${name#${submitter}-}
           cat > ${condorconfig} <<-EOF
       	#########################################################
       	# Automatically added for cloud_scheduler by ${EXEC_NAME}
@@ -112,6 +119,8 @@ runcmd:
       	MaxJobRetirementTime = 3600 * 24 * 2
       	SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
       	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
+      	START = ( Owner == \"${submitter}\" )
+      	VMType = \"${vmtype}\"
       	SUSPEND = FALSE
       	CONTINUE = TRUE
       	PREEMPT = FALSE
