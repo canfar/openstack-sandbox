@@ -17,7 +17,14 @@ import sys
 # ID of the batch tenant we need to share with
 _BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
 
-# OpenStack auth configuration
+# OpenStack auth configuration / defaults.
+# Take OS_* variables if provided (with following defaults).
+# command-line overrides OS_*
+if 'OS_AUTH_URL' not in os.environ:
+    os.environ['OS_AUTH_URL'] = 'https://nefos.westgrid.ca:5000/v2.0'
+if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
+    os.environ['OS_USERNAME'] = os.environ['USER']+'-canfar'
+
 auth = {'username':'',
         'password':'',
         'auth_url':''}
@@ -39,6 +46,8 @@ try:
     parser.add_argument('--username',help='user name if OS_USERNAME not set')
     parser.add_argument('--password',help='password if OS_PASSWORD not set')
     parser.add_argument('--auth_url',help='auth URL if OS_AUTH_URL not set')
+    parser.add_argument('-v','--verbose',default=False,
+                        help='verbose output',action='store_true')
 
     args,extra_args = parser.parse_known_args()
 
@@ -54,6 +63,10 @@ try:
                 % (key, osvar))
 
     jobfile = args.jobfile
+
+    if args.verbose:
+        print "auth_url: %s\nusername: %s\npassword: HIDDEN\njobfile: %s" % \
+            (auth['auth_url'],auth['username'],jobfile)
 
     # Get the name of the VM image from the submission file
     try:
@@ -87,7 +100,8 @@ try:
     matches = []
     glance_endpoint = ''
     for tenant in tenant_data['tenants']:
-        #print "Searching tenant %s: %s" % (tenant['name'],tenant['id'])
+        if args.verbose:
+            print "Searching tenant %s: %s" % (tenant['name'],tenant['id'])
 
         # Get a keystone client scoped to this tenant
         k = ksclient.Client(username=auth['username'],
@@ -122,8 +136,9 @@ try:
 
     # Share the image, and catch exception caused by previous shares
     match = matches[0]
-    #print "Found image in Tenant '%s', id '%s'" % \
-    #    (match['tenant'],match['id'])
+    if args.verbose:
+        print "Found image in Tenant '%s', id '%s'" % \
+            (match['tenant'],match['id'])
     glance = match['glclient']
     try:
         glance.image_members.create(match['id'],_BATCH_TENANT_ID)
