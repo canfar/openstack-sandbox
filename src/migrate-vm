@@ -254,7 +254,7 @@ try:
         m = re.search('kernel-([\d.-]+.el5).*',lines[-1])
         if m:
             kernel_version = m.group(1)
-        vcpselse:
+        else:
             raise Exception("Couldn't get installed kernel from yum.log")
         initrd_name = "initrd-%s.img" % (kernel_version)
         os.rename("%s/boot/%s" % (guestos,initrd_name), \
