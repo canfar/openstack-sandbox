@@ -17,12 +17,12 @@ import shutil
 import operator
 import time
 
-# Dictionary of known OS types (keys), and type strings (values) that
-# will be used to pattern match the product name string
-valid_os_type = { "sl5" : "Scientific Linux release 5",
-                  "sl6" : "Scientific Linux release 6",
-                  "ub12" : "Ubuntu 12.04",
-                  "ub13" : "Ubuntu 13.10" }
+# Dictionary to match product strings to handled OS types
+valid_os_type = { "Scientific Linux SL release 5" : "sl5", 
+                  "Scientific Linux release 5" : "sl5", 
+                  "Scientific Linux release 6" : "sl6", 
+                  "Ubuntu 12.04" : "ub12", 
+                  "Ubuntu 13.10" : "ub13" } 
 
 try:
     # parse command line
@@ -150,8 +150,8 @@ try:
 
     os_type = None
     for check_type in valid_os_type:
-        if re.search(valid_os_type[check_type],product_name):
-            os_type=check_type
+        if re.search(check_type,product_name):
+            os_type=valid_os_type[check_type]
             continue
 
     if os_type is None:
@@ -254,7 +254,7 @@ try:
         m = re.search('kernel-([\d.-]+.el5).*',lines[-1])
         if m:
             kernel_version = m.group(1)
-        else:
+        vcpselse:
             raise Exception("Couldn't get installed kernel from yum.log")
         initrd_name = "initrd-%s.img" % (kernel_version)
         os.rename("%s/boot/%s" % (guestos,initrd_name), \
