@@ -1,166 +1,31 @@
-#!/usr/bin/env python
+#!/bin/bash
 #
-# Wrapper for condor_submit that first searches the submission file for
-# the VM image name and shares it with the batch processing tenant
+# User script for submitting jobs. A wrapper for canfar_vm_share and
+# condor_submit.
 
-import argparse
-import glanceclient.v2.client as glclient
-from glanceclient.exc import HTTPConflict
-import keystoneclient.v2_0.client as ksclient
-import json
-import os
-import re
-import requests
-import subprocess
-import sys
+EXEC_NAME=$(basename $0 .${0##*.})
 
-# ID of the batch tenant we need to share with
-_BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
+die() {
+    echo "${EXEC_NAME}: $1" 1>&2
+    exit 1
+}
 
-# OpenStack auth configuration / defaults.
-# Take OS_* variables if provided (with following defaults).
-# command-line overrides OS_*
-if 'OS_AUTH_URL' not in os.environ:
-    os.environ['OS_AUTH_URL'] = 'https://nefos.westgrid.ca:5000/v2.0'
-if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
-    os.environ['OS_USERNAME'] = os.environ['USER']+'-canfar'
+usage() {
+    echo $"Usage: ${EXEC_NAME} [jobfile] [arg1] [arg2] ... [argn]
+Submit a CANFAR processing job
+  [jobfile]           CANFAR job submission file
+  [arg1] ... [argn]   Additional parameters passed to condor_submit
+"
+    exit
+}
 
-auth = {'username':'',
-        'password':'',
-        'auth_url':''}
 
-try:
-    # Parse command line
-    description = '''
-    Submit a CANFAR processing job.
+[ "$#" -ge 1 ] || usage
 
-    The VM image is first shared with the batch tenant so that it may be
-    instantiated by cloud scheduler. All remaining parameters are then
-    passed to condor_submit in order to queue the job.
-    '''
-    parser = argparse.ArgumentParser(description=description,
-                                     epilog='*NOTE: Additional arguments '+\
-                                         'will be passed to condor_submit.')
+JOBFILE=$1
 
-    parser.add_argument('jobfile',help='job description file')
-    parser.add_argument('--username',help='user name if OS_USERNAME not set')
-    parser.add_argument('--password',help='password if OS_PASSWORD not set')
-    parser.add_argument('--auth_url',help='auth URL if OS_AUTH_URL not set')
-    parser.add_argument('-v','--verbose',default=False,
-                        help='verbose output',action='store_true')
+[[ ! -e ${JOBFILE} ]] && die "jobfile '${JOBFILE}' does not exist"
 
-    args,extra_args = parser.parse_known_args()
+canfar_vm_share ${JOBFILE} || die "failed to share VM with batch tenant"
 
-    # Obtain auth parameters from command-line / environment
-    for key in auth:
-        osvar = 'OS_'+key.upper()
-        if eval( 'args.'+key ) :
-            auth[key] = eval( 'args.'+key )
-        elif osvar in os.environ:
-            auth[key] = os.environ[osvar]
-        else:
-            raise Exception("Neither --%s nor %s set in the environment" \
-                % (key, osvar))
-
-    jobfile = args.jobfile
-
-    if args.verbose:
-        print "auth_url: %s\nusername: %s\npassword: HIDDEN\njobfile: %s" % \
-            (auth['auth_url'],auth['username'],jobfile)
-
-    # Get the name of the VM image from the submission file
-    try:
-        jobfile_data = open(jobfile,'r').read()
-    except:
-        raise Exception("Error reading the contents of "+jobfile)
-
-    match_imagename = re.findall('\+VMAMI\s*=\s*\".*?:(.*?)\"',jobfile_data,
-                                 re.DOTALL)
-    if match_imagename:
-        imagename = match_imagename[0]
-    else:
-        raise Exception("Couldn't find '+VMAMI="+'"'+"<cloud name>:<image name>"+'" in jobfile.')
-
-    # Get a list of tenants that the user belongs to. We need to use the
-    # rest API directly because this function does not seem to be exposed
-    # by the python libraries. The keystone client is just a convenient
-    # way to get the token.
-    keystone = ksclient.Client(username=auth['username'],
-                               password=auth['password'],
-                               auth_url=auth['auth_url'])
-
-    token = keystone.auth_token
-    headers = {'X-Auth-Token': token }
-    tenant_url = auth['auth_url']+'/tenants'
-    r = requests.get(tenant_url, headers=headers)
-    tenant_data = r.json()
-
-    # Loop over tenants and search for the requested image name
-    print "Sharing VM image '%s' with batch tennant..." % imagename
-    matches = []
-    glance_endpoint = ''
-    for tenant in tenant_data['tenants']:
-        if args.verbose:
-            print "Searching tenant %s: %s" % (tenant['name'],tenant['id'])
-
-        # Get a keystone client scoped to this tenant
-        k = ksclient.Client(username=auth['username'],
-                            password=auth['password'],
-                            tenant_name=tenant['name'],
-                            auth_url=auth['auth_url'])
-
-        if not glance_endpoint:
-            # Get the glance endpoint. We do it here rather than the earlier
-            # keystone client because it needs to be tenant scoped.
-            glance_endpoint = k.service_catalog.url_for(service_type='image')
-
-        # Glance client in this same tenant
-        glance = glclient.Client(glance_endpoint, token=k.auth_token)
-
-        for image in glance.images.list():
-            if image['name'].lower() == imagename.lower():
-                # found a (case-insensitive) match to the name
-                matches.append({'tenant':tenant['name'],
-                                'id':image['id'],
-                                'glclient':glance})
-
-    # We should only get one match
-    if len(matches) == 0:
-        raise Exception("Couldn't find image named " + imagename)
-    elif len(matches) > 1:
-        errstr="Multiple matches:"
-        for match in matches:
-            errstr = errstr + "\nTenant '%s', id '%s'" \
-                % (match['tenant'],match['id'])
-        raise Exception(errstr)
-
-    # Share the image, and catch exception caused by previous shares
-    match = matches[0]
-    if args.verbose:
-        print "Found image in Tenant '%s', id '%s'" % \
-            (match['tenant'],match['id'])
-    glance = match['glclient']
-    try:
-        glance.image_members.create(match['id'],_BATCH_TENANT_ID)
-    except HTTPConflict as E:
-        if E.code == 409:
-            print "Image already shared."
-        else:
-            raise E
-
-    # Execute condor_submit
-    print "Submitting the job..."
-    cmd = ['condor_submit']
-    cmd.extend(extra_args)
-    cmd.append(jobfile)
-    cmd = ' '.join(cmd)
-    status = subprocess.call(cmd, shell=True)
-    if status:
-        raise Exception("Error executing: "+cmd)
-
-except Exception as E:
-    print E
-    sys.exit(1)
-
-print "Success!"
-sys.exit(0)
+condor_submit "$@" || die "failed to submit job to queue"
