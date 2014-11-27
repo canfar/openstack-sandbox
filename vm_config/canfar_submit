@@ -24,7 +24,7 @@ Submit a CANFAR processing job
 
 JOBFILE=$1
 
-[[ ! -e ${JOBFILE} ]] && die "jobfile '${JOBFILE}' does not exist"
+[[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
 
 canfar_vm_share ${JOBFILE} || die "failed to share VM with batch tenant"
 
