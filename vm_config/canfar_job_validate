@@ -1,0 +1,186 @@
+#!/usr/bin/env python
+#
+# Perform some basic validation on job submission files:
+#  - have the required +VM parameters been supplied?
+#  - has a valid flavor been requested?
+
+import argparse
+import collections
+import keystoneclient.v2_0.client as ksclient
+import novaclient.v1_1.client as nclient
+import json
+import os
+import re
+import requests
+import sys
+
+# Required parameters and related regex
+req_regex = collections.OrderedDict(
+    [ ['Requirements', 'VMType\s*=\?=\s*\\"(.*?)\\"[\s\\\]*&&[\s\\\]*Arch\s*==\s*\\"x86_64\\"'],
+      ['+VMAMI', '\\"canfar:(.*?)\\"'],
+      ['+VMInstanceType', '\\"canfar:(.*?)\\"' ] ])
+
+# example of a valid submission file:
+jobfile_example = '''
+
+The following is an example of a valid jobfile. A virtual image called
+'myimage' is used to execute a script called 'script.bash' with a single
+argument '42'. Condor logs are output to 'run_42.log',
+and 'run_42.out':
+
+
+Universe   = vanilla
+Executable = script.bash
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT_OR_EVICT
+RunAsOwner = True
+getenv = True
+transfer_output_files = /dev/null
+Requirements = VMType =?= "myimage" && Arch == "x86_64"
+
++VMAMI          = "canfar:myimage"
++VMInstanceType = "canfar:c2.low"
+
+Arguments = 42
+Log = run_42.log
+Output = run_42.out
+Error = run_42.log
+Queue
+'''
+
+# OpenStack auth configuration / defaults.
+# Take OS_* variables if provided (with following defaults).
+# command-line overrides OS_*
+if 'OS_AUTH_URL' not in os.environ:
+    os.environ['OS_AUTH_URL'] = 'https://nefos.westgrid.ca:5000/v2.0'
+if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
+    os.environ['OS_USERNAME'] = os.environ['USER']+'-canfar'
+
+auth = {'username':'',
+        'password':'',
+        'tenant_name' : '',
+        'auth_url':''}
+
+try:
+    # Parse command line
+    description = '''
+    Check for a valid job submission file.
+    '''
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('jobfile',help='job description file')
+    parser.add_argument('--username',help='user name if OS_USERNAME not set')
+    parser.add_argument('--password',help='password if OS_PASSWORD not set')
+    parser.add_argument('--tenant_name',
+                        help='tenant_name if OS_TENANT_NAME not set')
+    parser.add_argument('--auth_url',help='auth URL if OS_AUTH_URL not set')
+    parser.add_argument('-v','--verbose',default=False,
+                        help='verbose output',action='store_true')
+
+    args,extra_args = parser.parse_known_args()
+
+    # Obtain auth parameters from command-line / environment
+    for key in auth:
+        osvar = 'OS_'+key.upper()
+        if eval( 'args.'+key ):
+            auth[key] = eval( 'args.'+key )
+        elif osvar in os.environ:
+            auth[key] = os.environ[osvar]
+        elif key == 'tenant_name':
+            # If not set by user we will discover a tenant ourselves
+            pass
+        else:
+            raise Exception("Neither --%s nor %s set in the environment" \
+                % (key, osvar))
+
+    jobfile = args.jobfile
+
+    if args.verbose:
+        print "auth_url: %s\nusername: %s\npassword: HIDDEN\ntenant_name: %s\njobfile: %s" % \
+            (auth['auth_url'],auth['username'],auth['tenant_name'] or 'NOT SET',
+             jobfile)
+
+    # Check for required parameters in jobfile
+    try:
+        jobfile_data = open(jobfile,'r').read()
+    except:
+        raise Exception("Error reading the contents of "+jobfile)
+
+    for req in req_regex:
+        regex = req+"\s*=\s*"+req_regex[req]
+        if req[0] == '+':
+            # Parameters that start with + need to be escaped in regex
+            regex = '\\'+regex
+        match = re.findall(regex,jobfile_data,re.MULTILINE)
+
+        if not match:
+            msg = "Parameter '%s' not defined correctly in jobfile." % req
+            msg = msg+jobfile_example
+            raise Exception(msg)
+
+        if req == 'Requirements':
+            imagename=match[0]
+            
+        if req == '+VMAMI':
+            # We used OrderedDict so we know +VMAMI check after Requirements
+            if match[0] != imagename:
+                msg = "VM Image name in Requirements '" + \
+                                imagename + "' does not match value in " + \
+                                "+VMAMI '" + match[0] + "'"
+                msg = msg + jobfile_example
+                raise Exception(msg)
+                
+        if req == '+VMInstanceType':
+            flavor=match[0]
+
+    # Obtain a tenant for the user if none specified
+    # We need to use the rest API directly because this function does
+    # not seem to be exposed by the python libraries. The keystone
+    # client is just a convenient way to get the token.
+    if not auth['tenant_name']:
+        keystone = ksclient.Client(username=auth['username'],
+                            password=auth['password'],
+                            auth_url=auth['auth_url'])
+
+        token = keystone.auth_token
+        headers = {'X-Auth-Token': token }
+        tenant_url = auth['auth_url']+'/tenants'
+        r = requests.get(tenant_url, headers=headers)
+        tenant_data = r.json()
+        if len(tenant_data['tenants']) > 0:
+            tenant = tenant_data['tenants'][0]
+            auth['tenant_name'] = tenant['name']
+            if args.verbose:
+                print "No tenant_id specified, so choosing %s" \
+                    % auth['tenant_name']
+        else:
+            raise Exception('Unable to discover tenant_name. Please set')
+
+    # Check for a valid flavor
+    nova = nclient.Client(auth['username'], auth['password'],
+                          auth['tenant_name'], auth['auth_url'])
+
+    flavors = nova.flavors.list()
+    good_flavors = []
+    bad_flavors = []
+    for f in flavors:
+        if f.ephemeral:
+            good_flavors.append(f.name)
+        else:
+            bad_flavors.append(f.name)
+    if not good_flavors:
+        raise Exception("Error: cloud does not offer flavors with ephemeral partition!")
+
+    if flavor not in good_flavors:
+        msg = "Supplied flavor '%s' is not valid. Must be one of:\n"\
+              % flavor
+        msg = msg + ', '.join(good_flavors)
+        raise Exception(msg)
+        
+
+except Exception as E:
+    print "ERROR:",E
+    sys.exit(1)
+
+print "Success!"
+sys.exit(0)

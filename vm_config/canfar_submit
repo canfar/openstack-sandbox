@@ -26,6 +26,8 @@ JOBFILE=$1
 
 [[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
 
+canfar_job_validate ${JOBFILE} || die "failed to validate jobfile"
+
 canfar_vm_share ${JOBFILE} || die "failed to share VM with batch tenant"
 
 condor_submit "$@" || die "failed to submit job to queue"
