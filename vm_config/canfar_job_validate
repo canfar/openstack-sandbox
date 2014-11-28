@@ -18,7 +18,10 @@ import sys
 req_regex = collections.OrderedDict(
     [ ['Requirements', 'VMType\s*=\?=\s*\\"(.*?)\\"[\s\\\]*&&[\s\\\]*Arch\s*==\s*\\"x86_64\\"'],
       ['+VMAMI', '\\"canfar:(.*?)\\"'],
-      ['+VMInstanceType', '\\"canfar:(.*?)\\"' ] ])
+      ['+VMInstanceType', '\\"canfar:(.*?)\\"' ],
+      ['+VMAMIConfig','\\"(.*?)\\"'] ])
+
+yaml_url="https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/cloud_config.yml"
 
 # example of a valid submission file:
 jobfile_example = '''
@@ -40,13 +43,14 @@ Requirements = VMType =?= "myimage" && Arch == "x86_64"
 
 +VMAMI          = "canfar:myimage"
 +VMInstanceType = "canfar:c2.low"
++VMAMIConfig    = "%s"
 
 Arguments = 42
 Log = run_42.log
 Output = run_42.out
 Error = run_42.log
 Queue
-'''
+''' % yaml_url
 
 # OpenStack auth configuration / defaults.
 # Take OS_* variables if provided (with following defaults).
@@ -132,6 +136,11 @@ try:
                 
         if req == '+VMInstanceType':
             flavor=match[0]
+
+        if req == '+VMAMIConfig':
+            if match[0] != yaml_url:
+                msg = '+VMAMIConfig must be set to:\n"%s"' % yaml_url
+                raise Exception(msg)
 
     # Obtain a tenant for the user if none specified
     # We need to use the rest API directly because this function does
