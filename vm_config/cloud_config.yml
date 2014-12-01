@@ -145,22 +145,23 @@ runcmd:
       
       cs_setup_etc_hosts() {
           # set up condor ccb only if private networking is available
+          local etc_hosts=${1:-/etc/hosts}
           local priv_ip=$(ip -o -4 addr show eth0 | awk -F '[ /]+' '/global/ {print $4}')
           [[ -z ${priv_ip} ]] && die "failed to detect IP address"
           echo ${priv_ip} | egrep -v "127.|192.|172.|10." > /dev/null && return 0
-          msg "updating /etc/hosts"
+          msg "updating ${etc_hosts}"
           # ip are local
           local addstr="# Added for cloud_scheduler to connect to condor CCB"
-          if grep -q ${priv_ip} /etc/hosts ; then
-      	sed -i -e "/^[[:space:]]*${priv_ip}/s:\(.*${priv_ip}\).*:\1 ${HOSTNAME} ${addrstr}:" /etc/hosts
+          if grep -q ${priv_ip} ${etc_hosts} ; then
+      	sed -i -e "/^[[:space:]]*${priv_ip}/s:\(.*${priv_ip}\).*:\1 ${HOSTNAME} ${addstr}:" ${etc_hosts}
           else
-      	echo "${priv_ip} ${HOSTNAME} ${addstr}" >> /etc/hosts
+      	echo "${priv_ip} ${HOSTNAME} ${addstr}" >> ${etc_hosts}
           fi
           addstr="# Added for condor to specify central manager of local network"
-          if grep -q "${CM_HOST_IP}" /etc/hosts ; then
-      	sed -i -e "s:.*\(${addr}\):${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}:" /etc/hosts
+          if grep -q "${CM_HOST_IP}" ${etc_hosts} ; then
+      	sed -i -e "s:[[:space:]]${CM_HOST_IP}.*:${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}:" ${etc_hosts}
           else
-      	echo "${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}" >> /etc/hosts
+      	echo "${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}" >> ${etc_hosts}
           fi
       }
       
