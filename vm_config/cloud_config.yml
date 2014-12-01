@@ -16,13 +16,13 @@ runcmd:
       # Shell script to configure Condor for cloud scheduler
       
       EXEC_NAME=$(basename $0 .${0##*.})
-      EXEC_VERSION=0.1_rc
+      EXEC_VERSION=0.1
       
       EPHEMERAL_DIR="/ephemeral"
       
       CM_HOST_NAME="batch.canfar.net"
       # need to specify local ip because no local dns on nefos
-      CM_HOST_IP="192.168.0.3"
+      CM_HOST_IP="192.168.0.11"
       
       msg() {
           echo " >> ${EXEC_NAME}: $1"
