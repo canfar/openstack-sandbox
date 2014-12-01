@@ -149,7 +149,8 @@ runcmd:
           msg "updating /etc/hosts"
           # ip are local
           local addstr="# Added for cloud_scheduler to connect to condor CCB"
-          local ip=$(ifconfig eth0 | grep -oP '(?<=inet addr:)[0-9.]*')
+          local ip=$(ip -o -4 addr show eth0 | awk -F '[ /]+' '/global/ {print $4}')
+          [[ $ip ]] || die "failed to detect IP address"
           if grep -q "${addstr}" /etc/hosts ; then
       	sed -i -e "s:.*\(${addr}\):${ip} ${HOSTNAME} \1:" /etc/hosts
           else
