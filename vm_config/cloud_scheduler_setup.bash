@@ -136,7 +136,7 @@ cs_setup_etc_hosts() {
     [[ -z ${priv_ip} ]] && die "failed to detect IP address"
     echo ${priv_ip} | egrep -v "127.|192.|172.|10." > /dev/null && return 0
     msg "updating ${etc_hosts}"
-    # ip are local
+    # ip are private
     local addstr="# Added for cloud_scheduler to connect to condor CCB"
     if grep -q ${priv_ip} ${etc_hosts} ; then
 	sed -i -e "/^[[:space:]]*${priv_ip}/s:\(.*${priv_ip}\).*:\1 ${HOSTNAME} ${addstr}:" ${etc_hosts}
@@ -144,7 +144,8 @@ cs_setup_etc_hosts() {
 	echo "${priv_ip} ${HOSTNAME} ${addstr}" >> ${etc_hosts}
     fi
     addstr="# Added for condor to specify central manager of local network"
-    if grep -q "${CM_HOST_IP}" ${etc_hosts} ; then
+    sed -i -e "/${CM_HOST_NAME}/d" ${etc_hosts}
+    if grep -q "${CM_HOST_IP}" ${etc_hosts} ; then	
 	sed -i -e "s:[[:space:]]${CM_HOST_IP}.*:${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}:" ${etc_hosts}
     else
 	echo "${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}" >> ${etc_hosts}
