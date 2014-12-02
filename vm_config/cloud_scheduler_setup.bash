@@ -85,8 +85,6 @@ cs_condor_configure() {
 	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
 	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
     fi
-    # on CentOS 7 /var/lock/condor is incorrectly owned by root
-    chown condor:condor /var/lock/condor
     # hack because of bug cloud scheduler does not update VMType and START anymore
     # guess info from subname to match requirements
     # vmtype can have '-' in the name but assume cloud name and user don't
@@ -129,6 +127,8 @@ cs_condor_configure() {
     chmod ugo+rwxt ${EPHEMERAL_DIR}
     msg "restart condor services to include configuration changes"
     service condor restart
+    # on CentOS 7 /var/lock/condor is incorrectly owned by root
+    chown condor:condor /var/lock/condor
 }
 
 cs_setup_etc_hosts() {
