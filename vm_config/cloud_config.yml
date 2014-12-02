@@ -50,7 +50,7 @@ runcmd:
       # install condor for rpm or deb distros
       condor_install() {
           condor_version > /dev/null 2>&1 && msg "condor is already installed" && return 0
-          msg "installing condor"    
+          msg "installing condor"
           # determine os
           if yum --version > /dev/null 2>&1 ; then
       	msg "rpm/yum based distribution detected - now identifiying"
@@ -99,9 +99,6 @@ runcmd:
       	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
       	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
           fi
-          # on CentOS 7 /var/lock/condor is incorrectly owned by root
-          [[ -d /var/lock/condor ]] || mkdir /var/lock/condor
-          chown condor:condor /var/lock/condor
           # hack because of bug cloud scheduler does not update VMType and START anymore
           # guess info from subname to match requirements
           # vmtype can have '-' in the name but assume cloud name and user don't
@@ -144,6 +141,14 @@ runcmd:
           chmod ugo+rwxt ${EPHEMERAL_DIR}
           msg "restart condor services to include configuration changes"
           service condor restart
+          # on CentOS 7 /var/lock/condor is incorrectly owned by root
+          if condor_version | grep -q RedHat_7; then
+              msg "RedHat 7 derivatives need hack for /var/lock/condor ownership."
+              msg "Sleeping 10s first..."
+              sleep 10 # try to let daemon create it first
+              [[ -d /var/lock/condor ]] || mkdir /var/lock/condor
+              chown condor:condor /var/lock/condor
+          fi
       }
       
       cs_setup_etc_hosts() {
