@@ -126,15 +126,14 @@ cs_condor_configure() {
     chown condor:condor ${EPHEMERAL_DIR}
     chmod ugo+rwxt ${EPHEMERAL_DIR}
     msg "restart condor services to include configuration changes"
-    service condor restart
     # on CentOS 7 /var/lock/condor is incorrectly owned by root
     if condor_version | grep -q RedHat_7; then
+        service condor stop
         msg "RedHat 7 derivatives need hack for /var/lock/condor ownership."
-        msg "Sleeping 10s first..."
-        sleep 10 # try to let daemon create it first
-        [[ -d /var/lock/condor ]] || mkdir /var/lock/condor
+        mkdir -p /var/lock/condor
         chown condor:condor /var/lock/condor
     fi
+    service condor restart
 }
 
 cs_setup_etc_hosts() {
