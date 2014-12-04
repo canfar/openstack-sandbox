@@ -13,9 +13,9 @@ die() {
 usage() {
     echo $"Usage: ${EXEC_NAME} [jobfile] [image_uri] [flavor]
 Submit a CANFAR processing job
-  [jobfile]           Condor job submission file
-  [image_uri]         VM image for job, can be 'canfar:image_uuid' or 'canfar:tenant_name/image_name'
-  [flavor]            A valid hardware flavor
+  [jobfile]           Condor job description submission file
+  [image_uri]         VM image for job. Valid forms: 'canfar:image_uuid' or 'canfar:tenant_name/image_name'
+  [flavor]            a valid hardware flavor
 "
     exit
 }

@@ -8,7 +8,7 @@
 # flavor:       hardware profile for the cloud
 #
 # This script validates these inputs and writes a validated script
-# including extra cloud scheduler parameters to stdoud.
+# including extra cloud scheduler parameters to stdout.
 #
 # Bad exit status is set upon failure.
 
@@ -53,18 +53,19 @@ auth = {'username':'',
 
 try:
     # Parse command line
-    description = '''
-    Validate job submission
+    description = \
+    '''Create a validated CANFAR submission file (written to stdout) based on
+    a Condor job description file and other user inputs.
     '''
     parser = argparse.ArgumentParser(description=description)
 
-    parser.add_argument('jobfile',help='job description file')
-    parser.add_argument('image_uri',help='VM image for job, can be "canfar:image_uuid" or "canfar:tenant_name/image_name" (this image tenant_name need not match auth --tenant_name')
+    parser.add_argument('jobfile',help='Condor job description file')
+    parser.add_argument('image_uri',help="VM image for job. Valid forms: 'canfar:image_uuid' or 'canfar:tenant_name/image_name' (this image tenant_name need not match --tenant_name)")
     parser.add_argument('flavor',help='a valid hardware flavor')
     parser.add_argument('--username',help='user name if OS_USERNAME not set')
     parser.add_argument('--password',help='password if OS_PASSWORD not set')
     parser.add_argument('--tenant_name',
-                        help='tenant_name if OS_TENANT_NAME not set (for authentication only - not required)')
+                        help='tenant_name if OS_TENANT_NAME not set (for authentication only; not required)')
     parser.add_argument('--auth_url',help='auth URL if OS_AUTH_URL not set')
 
     parser.add_argument('-v','--verbose',default=False,
@@ -146,8 +147,12 @@ try:
                         auth_url=auth['auth_url'])
     glance_endpoint = k.service_catalog.url_for(service_type='image')
 
+    try:
+        part = image_uri.split(':',1)[1]
+    except:
+        raise Exception("image_uri '%s' must be of the form 'canfar:image_uid' or 'canfar:tenant_name/image_name'" % image_uri)
+
     # parse image_uri and try to identify/verify its uuid
-    part = image_uri.split(':',1)[1]
     try:
         # user provided uuid directly after canfar:
         image_uuid = str(uuid.UUID(part))
@@ -180,6 +185,12 @@ try:
             raise Exception("image_uri '%s' is badly formed" % image_uri) 
 
         # Now look for a unique match to supplied image name
+        k = ksclient.Client(username=auth['username'],
+                            password=auth['password'],
+                            tenant_name=image_tenant_name,
+                            auth_url=auth['auth_url'])
+        glance = glclient.Client(glance_endpoint, token=k.auth_token)
+
         matches = []
         for glanceimage in glance.images.list():
             if glanceimage['name'] == image_name:
