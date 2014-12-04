@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# User script for submitting jobs. A wrapper for canfar_vm_share and
+# User script for submitting jobs. A wrapper for canfar_job_validate and
 # condor_submit.
 
 EXEC_NAME=$(basename $0 .${0##*.})
@@ -11,23 +11,24 @@ die() {
 }
 
 usage() {
-    echo $"Usage: ${EXEC_NAME} [jobfile] [arg1] [arg2] ... [argn]
+    echo $"Usage: ${EXEC_NAME} [jobfile] [image_uri] [flavor]
 Submit a CANFAR processing job
-  [jobfile]           CANFAR job submission file
-  [arg1] ... [argn]   Additional parameters passed to condor_submit
+  [jobfile]           Condor job description submission file
+  [image_uri]         VM image for job. Valid forms: 'image_uuid' or 'tenant_name:image_name'
+  [flavor]            a valid hardware flavor
 "
     exit
 }
 
 
-[ "$#" -ge 1 ] || usage
+[ "$#" -eq 3 ] || usage
 
 JOBFILE=$1
+IMAGE_URI=$2
+FLAVOR=$3
 
 [[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
 
-canfar_job_validate ${JOBFILE} || die "failed to validate jobfile"
+JOB=`./canfar_job_validate ${JOBFILE} ${IMAGE_URI} ${FLAVOR}` || die "failed to validate jobfile: ${JOB}"
 
-canfar_vm_share ${JOBFILE} || die "failed to share VM with batch tenant"
-
-condor_submit "$@" || die "failed to submit job to queue"
+echo "${JOB}" | condor_submit || die "failed to submit job to queue"

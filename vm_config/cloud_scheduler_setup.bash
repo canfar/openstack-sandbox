@@ -159,6 +159,19 @@ cs_setup_etc_hosts() {
     fi
 }
 
+cs_remove_selinux() {
+    # not friendly with condor in our configuration
+    sed -i -e 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
+    setenforce 0
+}
+
+
+cs_fix_resolv_conf() {
+    # frequent dns issues with openstack on nefos
+    # adding google one
+    sed -i -e '1inameserver 8.8.8.8' /etc/resolv.conf
+}
+
 # Store all options
 OPTS=$(getopt \
     -o c:i:e:uhv \
@@ -191,7 +204,9 @@ done
 
 export PATH="/sbin:/usr/sbin:${PATH}"
 
+cs_fix_resolv_conf
 condor_install
+
 if [[ ${UPDATE_CS} == true ]]; then
    cs_setup_etc_hosts
    cs_condor_configure

@@ -1,55 +1,42 @@
 #!/usr/bin/env python
 #
-# Perform some basic validation on job submission files:
-#  - have the required +VM parameters been supplied?
-#  - has a valid flavor been requested?
+# A user provides a bare condor submission file, as well as some additional
+# cloud scheduler / OpenStack parameters:
+# image_uri:    canfar:uuid
+#                    or
+#               canfar:tenant_name/image_name
+# flavor:       hardware profile for the cloud
+#
+# This script validates these inputs and writes a validated script
+# including extra cloud scheduler parameters to stdout.
+#
+# Bad exit status is set upon failure.
 
 import argparse
 import collections
 import keystoneclient.v2_0.client as ksclient
 import novaclient.v1_1.client as nclient
+import glanceclient.v2.client as glclient
+from glanceclient.exc import HTTPConflict
 import json
 import os
 import re
 import requests
 import sys
+import uuid
+import logging
+#logging.basicConfig()
+logging.disable(logging.CRITICAL)
 
-# Required parameters and related regex
-req_regex = collections.OrderedDict(
-    [ ['Requirements', 'VMType\s*=\?=\s*\\"(.*?)\\"[\s\\\]*&&[\s\\\]*Arch\s*==\s*\\"x86_64\\"'],
-      ['+VMAMI', '\\"canfar:(.*?)\\"'],
-      ['+VMInstanceType', '\\"canfar:(.*?)\\"' ],
-      ['+VMAMIConfig','\\"(.*?)\\"'] ])
+# ID of the batch tenant we need to share with                                 
+_BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
 
-yaml_url="https://raw.githubusercontent.com/canfar/openstack-sandbox/master/vm_config/cloud_config.yml"
-
-# example of a valid submission file:
-jobfile_example = '''
-
-The following is an example of a valid jobfile. A virtual image called
-'myimage' is used to execute a script called 'script.bash' with a single
-argument '42'. Condor logs are output to 'run_42.log',
-and 'run_42.out':
-
-
-Universe   = vanilla
-Executable = script.bash
-should_transfer_files = YES
-when_to_transfer_output = ON_EXIT_OR_EVICT
-RunAsOwner = True
-transfer_output_files = /dev/null
-Requirements = VMType =?= "myimage" && Arch == "x86_64"
-
-+VMAMI          = "canfar:myimage"
-+VMInstanceType = "canfar:c2.low"
-+VMAMIConfig    = "%s"
-
-Arguments = 42
-Log = run_42.log
-Output = run_42.out
-Error = run_42.log
-Queue
-''' % yaml_url
+# Parameters that we generate (e.g., from command-line parameters)
+# and don't want user to define, along with a message explaining why.
+param_disallow = dict(
+    [ ['Requirements', 'Generated from image_uri'],
+      ['+VMAMI', 'Generated from image_uri'],
+      ['+VMInstanceType', 'Generated from flavor'] ] )
 
 # OpenStack auth configuration / defaults.
 # Take OS_* variables if provided (with following defaults).
@@ -66,17 +53,21 @@ auth = {'username':'',
 
 try:
     # Parse command line
-    description = '''
-    Check for a valid job submission file.
+    description = \
+    '''Create a validated CANFAR submission file (written to stdout) based on
+    a Condor job description file and other user inputs.
     '''
     parser = argparse.ArgumentParser(description=description)
 
-    parser.add_argument('jobfile',help='job description file')
+    parser.add_argument('jobfile',help='Condor job description file')
+    parser.add_argument('image_uri',help="VM image for job. Valid forms: 'image_uuid' or 'tenant_name:image_name' (this image tenant_name need not match --tenant_name)")
+    parser.add_argument('flavor',help='a valid hardware flavor')
     parser.add_argument('--username',help='user name if OS_USERNAME not set')
     parser.add_argument('--password',help='password if OS_PASSWORD not set')
     parser.add_argument('--tenant_name',
-                        help='tenant_name if OS_TENANT_NAME not set')
+                        help='tenant_name if OS_TENANT_NAME not set (for authentication only; not required)')
     parser.add_argument('--auth_url',help='auth URL if OS_AUTH_URL not set')
+
     parser.add_argument('-v','--verbose',default=False,
                         help='verbose output',action='store_true')
 
@@ -97,6 +88,8 @@ try:
                 % (key, osvar))
 
     jobfile = args.jobfile
+    image_uri = args.image_uri
+    flavor = args.flavor
 
     if args.verbose:
         print "auth_url: %s\nusername: %s\npassword: HIDDEN\ntenant_name: %s\njobfile: %s" % \
@@ -107,54 +100,37 @@ try:
     try:
         jobfile_data = open(jobfile,'r').read()
     except:
-        raise Exception("Error reading the contents of "+jobfile)
+        raise Exception("Could not read the contents of "+jobfile)
 
-    for req in req_regex:
-        regex = req+"\s*=\s*"+req_regex[req]
-        if req[0] == '+':
+    for param in param_disallow:
+        regex = param+"\s*=.*"
+        if param[0] == '+':
             # Parameters that start with + need to be escaped in regex
             regex = '\\'+regex
         match = re.findall(regex,jobfile_data,re.MULTILINE)
 
-        if not match:
-            msg = "Parameter '%s' not defined correctly in jobfile." % req
-            msg = msg+jobfile_example
+        if match:
+            msg = "jobfile should not contain parameter '%s':\n%s" \
+                  % (param, param_disallow[param])
             raise Exception(msg)
 
-        if req == 'Requirements':
-            imagename=match[0]
-            
-        if req == '+VMAMI':
-            # We used OrderedDict so we know +VMAMI check after Requirements
-            if match[0] != imagename:
-                msg = "VM Image name in Requirements '" + \
-                                imagename + "' does not match value in " + \
-                                "+VMAMI '" + match[0] + "'"
-                msg = msg + jobfile_example
-                raise Exception(msg)
-                
-        if req == '+VMInstanceType':
-            flavor=match[0]
+    # This keystone client is a convenient way to get a
+    # non-tenant-scoped token.
+    k_nt = ksclient.Client(username=auth['username'],
+                           password=auth['password'],
+                           auth_url=auth['auth_url'])
 
-        if req == '+VMAMIConfig':
-            if match[0] != yaml_url:
-                msg = '+VMAMIConfig must be set to:\n"%s"' % yaml_url
-                raise Exception(msg)
+    # Obtain a list of all tenants the user belongs to.  We are going
+    # to use REST API directly as Python libraries don't expose all
+    # functionality we need.
+    token = k_nt.auth_token
+    headers = {'X-Auth-Token': token }
+    tenant_url = auth['auth_url']+'/tenants'
+    r = requests.get(tenant_url, headers=headers)
+    tenant_data = r.json()
 
-    # Obtain a tenant for the user if none specified
-    # We need to use the rest API directly because this function does
-    # not seem to be exposed by the python libraries. The keystone
-    # client is just a convenient way to get the token.
+    # Take first tenant for auth purposes if none specified
     if not auth['tenant_name']:
-        keystone = ksclient.Client(username=auth['username'],
-                            password=auth['password'],
-                            auth_url=auth['auth_url'])
-
-        token = keystone.auth_token
-        headers = {'X-Auth-Token': token }
-        tenant_url = auth['auth_url']+'/tenants'
-        r = requests.get(tenant_url, headers=headers)
-        tenant_data = r.json()
         if len(tenant_data['tenants']) > 0:
             tenant = tenant_data['tenants'][0]
             auth['tenant_name'] = tenant['name']
@@ -164,31 +140,129 @@ try:
         else:
             raise Exception('Unable to discover tenant_name. Please set')
 
+    # Now get a tenant-scoped keystone client, and obtain the glance_endpoint
+    k = ksclient.Client(username=auth['username'],
+                        password=auth['password'],
+                        tenant_name=auth['tenant_name'],
+                        auth_url=auth['auth_url'])
+    glance_endpoint = k.service_catalog.url_for(service_type='image')
+
+    # parse image_uri and try to identify/verify its uuid
+    try:
+        # user provided uuid 
+        image_uuid = str(uuid.UUID(image_uri))
+
+        # Loop over all tenants to find that image
+        matches = []
+        
+        for tenant in tenant_data['tenants']:
+            if args.verbose:
+                print "Searching tenant %s: %s" % (tenant['name'],tenant['id'])
+
+            # Get a keystone/glance clients scoped to this tenant              
+            k = ksclient.Client(username=auth['username'],
+                                password=auth['password'],
+                                tenant_name=tenant['name'],
+                                auth_url=auth['auth_url'])
+            glance = glclient.Client(glance_endpoint, token=k.auth_token)
+            if image_uuid in [ i['id'] for i in glance.images.list() ]:
+                image_tenant_name = tenant['name']
+
+        if not image_tenant_name:
+            raise Exception("Could not locate tenant for image uuid '%s'" \
+                            % image_uuid)
+
+    except ValueError:
+        try:
+            # see if we have tenant_name:image_name
+            (image_tenant_name,image_name) = image_uri.split(':',1)
+        except:
+            raise Exception("image_uri '%s' is badly formed" % image_uri) 
+
+        # Now look for a unique match to supplied image name
+        try:
+            k = ksclient.Client(username=auth['username'],
+                                password=auth['password'],
+                                tenant_name=image_tenant_name,
+                                auth_url=auth['auth_url'])
+            glance = glclient.Client(glance_endpoint, token=k.auth_token)
+        except Exception as E:
+            raise Exception("Couldn't authenticate to tenant '%s': " % image_tenant_name + \
+                            str(E))
+
+        matches = []
+        for glanceimage in glance.images.list():
+            if glanceimage['name'] == image_name:
+                matches.append(glanceimage['id'])
+
+        if len(matches) == 0:
+            raise Exception("Couldn't find image named '%s'" % image_name)
+        elif len(matches) > 1:
+            errstr="Multiple image UUIDs in tenant '%s' match image name '%s':\n%s"\
+                % (image_tenant_name, image_name, '\n'.join(matches))
+            raise Exception(errstr)
+
+        # unique image_uuid
+        image_uuid = matches[0]
+
+        if args.verbose:
+            print "image_uuid: %s" % image_uuid
+
+    # Share the image with batch tenant. First we need to ensure that we
+    # have a glance client scoped to the correct tenant of the image.
+    if args.verbose:
+        print "sharing image uuid '%s' from tenant '%s' with batch tenant" % \
+            (image_uuid,image_tenant_name)
+    k = ksclient.Client(username=auth['username'],
+                        password=auth['password'],
+                        tenant_name=image_tenant_name,
+                        auth_url=auth['auth_url'])
+    glance = glclient.Client(glance_endpoint, token=k.auth_token)
+    try:
+        glance.image_members.create(image_uuid,_BATCH_TENANT_ID)
+    except HTTPConflict as E:
+        if E.code == 409:
+            if args.verbose:
+                print "Image already shared."
+            pass
+        else:
+            raise E
+
+
     # Check for a valid flavor
     nova = nclient.Client(auth['username'], auth['password'],
                           auth['tenant_name'], auth['auth_url'])
 
     flavors = nova.flavors.list()
-    good_flavors = []
-    bad_flavors = []
-    for f in flavors:
-        if f.ephemeral:
-            good_flavors.append(f.name)
-        else:
-            bad_flavors.append(f.name)
-    if not good_flavors:
-        raise Exception("Error: cloud does not offer flavors with ephemeral partition!")
+    #good_flavors = []
+    #bad_flavors = []
+    #for f in flavors:
+    #    if f.ephemeral:
+    #        good_flavors.append(f.name)
+    #    else:
+    #        bad_flavors.append(f.name)
+    #if not good_flavors:
+    #    raise Exception("Error: cloud does not offer flavors with ephemeral partition!")
 
-    if flavor not in good_flavors:
+    #if flavor not in good_flavors:
+
+    flavor_names = [f.name for f in flavors]
+    if flavor not in flavor_names:
         msg = "Supplied flavor '%s' is not valid. Must be one of:\n"\
               % flavor
-        msg = msg + ', '.join(good_flavors)
+        msg = msg + ', '.join(flavor_names)
         raise Exception(msg)
         
-
 except Exception as E:
     print "ERROR:",E
     sys.exit(1)
 
-print "Success!"
+
+jobfile = '''Requirements = VMType =?= "%s" && Arch == "x86_64"
++VMAMI          = "canfar:%s"
++VMInstanceType = "canfar:%s"
+''' % (image_uri,image_uuid,flavor) + jobfile_data
+
+print jobfile
+
 sys.exit(0)
