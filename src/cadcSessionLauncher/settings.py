@@ -23,13 +23,15 @@ EXPIRATION_DAYS = 1
 #   - target is set to the current page URL so that it can return afterwards.
 #   - scope is a full VOSpace URI for which a scoped token is being requested.
 _base_url = 'www.canfar.phys.uvic.ca'
+_delegation_url = _base_url+'/canfar/loginDelegation.html'
+_scope =  urllib.quote_plus('vos://cadc.nrc.ca~vospace/echapin')
+
 _request = 'http://'+os.environ["HTTP_HOST"]+os.environ["REQUEST_URI"]
 _url = urlparse.urlparse(_request)._replace(query='')
 _target = urlparse.urlunparse(_url)  # CGI script URL without query parameters
 
-LOGIN_PAGE = 'http://'+_base_url+ \
-    '/canfar/loginDelegation.html?target=' + _target + '&scope=' + \
-    urllib.quote_plus('vos://cadc.nrc.ca~vospace/echapin')
+LOGIN_PAGE = 'http://'+_delegation_url + \
+    '?target=' + _target + '&scope=' + _scope
 
 # Script for starting sessions. It should have the following properties:
 # 1. optionally takes one argument for the VOS token string. If not
