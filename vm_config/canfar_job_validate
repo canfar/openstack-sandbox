@@ -42,7 +42,7 @@ param_disallow = dict(
 # Take OS_* variables if provided (with following defaults).
 # command-line overrides OS_*
 if 'OS_AUTH_URL' not in os.environ:
-    os.environ['OS_AUTH_URL'] = 'https://nefos.westgrid.ca:5000/v2.0'
+    os.environ['OS_AUTH_URL'] = 'https://west.cloud.computecanada.ca:5000/v2.0'
 if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
     os.environ['OS_USERNAME'] = os.environ['USER']+'-canfar'
 
@@ -62,11 +62,11 @@ try:
     parser.add_argument('jobfile',help='Condor job description file')
     parser.add_argument('image_uri',help="VM image for job. Valid forms: 'image_uuid' or 'tenant_name:image_name' (this image tenant_name need not match --tenant_name)")
     parser.add_argument('flavor',help='a valid hardware flavor')
-    parser.add_argument('--username',help='user name if OS_USERNAME not set')
-    parser.add_argument('--password',help='password if OS_PASSWORD not set')
-    parser.add_argument('--tenant_name',
-                        help='tenant_name if OS_TENANT_NAME not set (for authentication only; not required)')
-    parser.add_argument('--auth_url',help='auth URL if OS_AUTH_URL not set')
+    parser.add_argument('--os-username',help='user name if OS_USERNAME not set')
+    parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
+    parser.add_argument('--os-tenant-name',
+                        help='tenant name if OS_TENANT_NAME not set (for authentication only; not required)')
+    parser.add_argument('--os-auth-url',help='auth URL if OS_AUTH_URL not set')
 
     parser.add_argument('-v','--verbose',default=False,
                         help='verbose output',action='store_true')
@@ -75,9 +75,10 @@ try:
 
     # Obtain auth parameters from command-line / environment
     for key in auth:
-        osvar = 'OS_'+key.upper()
-        if eval( 'args.'+key ):
-            auth[key] = eval( 'args.'+key )
+        argname = 'os_'+key
+        osvar = argname.upper()
+        if eval( 'args.'+argname ):
+            auth[key] = eval( 'args.'+argname )
         elif osvar in os.environ:
             auth[key] = os.environ[osvar]
         elif key == 'tenant_name':
@@ -85,7 +86,7 @@ try:
             pass
         else:
             raise Exception("Neither --%s nor %s set in the environment" \
-                % (key, osvar))
+                % (argname.replace('_','-'), osvar))
 
     jobfile = args.jobfile
     image_uri = args.image_uri
