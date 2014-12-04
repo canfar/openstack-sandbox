@@ -60,7 +60,7 @@ try:
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('jobfile',help='Condor job description file')
-    parser.add_argument('image_uri',help="VM image for job. Valid forms: 'canfar:image_uuid' or 'canfar:tenant_name/image_name' (this image tenant_name need not match --tenant_name)")
+    parser.add_argument('image_uri',help="VM image for job. Valid forms: 'image_uuid' or 'tenant_name:image_name' (this image tenant_name need not match --tenant_name)")
     parser.add_argument('flavor',help='a valid hardware flavor')
     parser.add_argument('--username',help='user name if OS_USERNAME not set')
     parser.add_argument('--password',help='password if OS_PASSWORD not set')
@@ -147,15 +147,10 @@ try:
                         auth_url=auth['auth_url'])
     glance_endpoint = k.service_catalog.url_for(service_type='image')
 
-    try:
-        part = image_uri.split(':',1)[1]
-    except:
-        raise Exception("image_uri '%s' must be of the form 'canfar:image_uid' or 'canfar:tenant_name/image_name'" % image_uri)
-
     # parse image_uri and try to identify/verify its uuid
     try:
-        # user provided uuid directly after canfar:
-        image_uuid = str(uuid.UUID(part))
+        # user provided uuid 
+        image_uuid = str(uuid.UUID(image_uri))
 
         # Loop over all tenants to find that image
         matches = []
@@ -179,17 +174,21 @@ try:
 
     except ValueError:
         try:
-            # see if we have tenant_name/image_name
-            (image_tenant_name,image_name) = part.split('/',1)
+            # see if we have tenant_name:image_name
+            (image_tenant_name,image_name) = image_uri.split(':',1)
         except:
             raise Exception("image_uri '%s' is badly formed" % image_uri) 
 
         # Now look for a unique match to supplied image name
-        k = ksclient.Client(username=auth['username'],
-                            password=auth['password'],
-                            tenant_name=image_tenant_name,
-                            auth_url=auth['auth_url'])
-        glance = glclient.Client(glance_endpoint, token=k.auth_token)
+        try:
+            k = ksclient.Client(username=auth['username'],
+                                password=auth['password'],
+                                tenant_name=image_tenant_name,
+                                auth_url=auth['auth_url'])
+            glance = glclient.Client(glance_endpoint, token=k.auth_token)
+        except Exception as E:
+            raise Exception("Couldn't authenticate to tenant '%s': " % image_tenant_name + \
+                            str(E))
 
         matches = []
         for glanceimage in glance.images.list():
@@ -262,7 +261,7 @@ except Exception as E:
 jobfile = '''Requirements = VMType =?= "%s" && Arch == "x86_64"
 +VMAMI          = "canfar:%s"
 +VMInstanceType = "canfar:%s"
-''' % (image_uuid,image_uuid,flavor) + jobfile_data
+''' % (image_uri,image_uuid,flavor) + jobfile_data
 
 print jobfile
 

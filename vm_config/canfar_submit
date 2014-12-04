@@ -14,7 +14,7 @@ usage() {
     echo $"Usage: ${EXEC_NAME} [jobfile] [image_uri] [flavor]
 Submit a CANFAR processing job
   [jobfile]           Condor job description submission file
-  [image_uri]         VM image for job. Valid forms: 'canfar:image_uuid' or 'canfar:tenant_name/image_name'
+  [image_uri]         VM image for job. Valid forms: 'image_uuid' or 'tenant_name:image_name'
   [flavor]            a valid hardware flavor
 "
     exit
@@ -29,6 +29,6 @@ FLAVOR=$3
 
 [[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
 
-JOB=`canfar_job_validate ${JOBFILE} ${IMAGE_URI} ${FLAVOR}` || die "failed to validate jobfile: ${JOB}"
+JOB=`./canfar_job_validate ${JOBFILE} ${IMAGE_URI} ${FLAVOR}` || die "failed to validate jobfile: ${JOB}"
 
-echo ${JOB} | condor_submit || die "failed to submit job to queue"
+echo "${JOB}" | condor_submit || die "failed to submit job to queue"
