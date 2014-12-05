@@ -29,6 +29,6 @@ FLAVOR=$3
 
 [[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
 
-JOB=`./canfar_job_validate ${JOBFILE} ${IMAGE_URI} ${FLAVOR}` || die "failed to validate jobfile: ${JOB}"
+JOB=`canfar_job_validate ${JOBFILE} ${IMAGE_URI} ${FLAVOR}` || die "failed to validate jobfile: ${JOB}"
 
 echo "${JOB}" | condor_submit || die "failed to submit job to queue"
