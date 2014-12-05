@@ -27,6 +27,7 @@ import cadcSessionLauncher
 
 # success/fail session launcher scripts
 script_success = 'test/session_test_success.sh'
+script_test_manage = 'test/session_test_manage.sh'
 script_fail = 'test/session_test_fail.sh'
 cadcSessionLauncher.SESSION_SCRIPT=script_success
 
@@ -66,7 +67,7 @@ def parse_session_launcher():
     m = httplib.HTTPMessage(f)
 
     header = dict()
-    header['cookies'] = []
+    header['cookies'] = dict()
 
     for line in str(m).split("\n"):
         try:
@@ -74,7 +75,9 @@ def parse_session_launcher():
             val = val.strip()
             key = key.lower()
             if key == 'set-cookie':
-                header['cookies'].append(val)
+                c = Cookie.SimpleCookie(val)
+                for k in c:
+                    header['cookies'][k] = c[k].value
             if key == 'status':
                 header['status'] = val.split()[0]
                 continue
@@ -92,6 +95,10 @@ class TestSessionLauncher(unittest.TestCase):
 
     # An anonymous user
     def test_anon(self):
+
+        # First tests don't let the session script manage sessions
+        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
+
         # first time in no cookie, create session and redirect
         h = parse_session_launcher()
         self.assertEqual(h['status'],'303')
@@ -113,6 +120,33 @@ class TestSessionLauncher(unittest.TestCase):
         del os.environ['QUERY_STRING']
         del os.environ['HTTP_COOKIE']
 
+        # test SESSION_SCRIPT_MANAGE. First time in it starts
+        # a completely new session. The next time it should call
+        # the session starter script with the same sessionid it
+        # generated on the first call and get the same link
+        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=True
+        cadcSessionLauncher.SESSION_SCRIPT=script_test_manage
+        os.environ['QUERY_STRING'] = 'new=yes'
+        h = parse_session_launcher()
+        sessionid = h['cookies']['sessionid']
+        sessionlink='http://test.url.com?sessionid=%s' % sessionid
+        self.assertEqual(h['status'],'303')
+        self.assertEqual(h['location'],sessionlink)
+
+        cookie_next_visit = 'sessionlink="%s"; sessionid=%s' \
+            % (sessionlink,sessionid)
+        os.environ['HTTP_COOKIE'] = cookie_next_visit
+        h = parse_session_launcher()
+        self.assertEqual(h['cookies']['sessionid'],sessionid)
+        self.assertEqual(h['status'],'303')
+        self.assertEqual(h['location'],sessionlink)
+
+        del os.environ['QUERY_STRING']
+        del os.environ['HTTP_COOKIE']
+        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
+        cadcSessionLauncher.SESSION_SCRIPT=script_success
+
+
     # Session script failures
     def test_session_script(self):
         # Incorrect filename in settings, can't execute
@@ -130,6 +164,10 @@ class TestSessionLauncher(unittest.TestCase):
     # An authenticated user
     @patch('urllib2.build_opener')
     def test_auth(self,mock_build_opener):
+
+        # First tests don't let the session script manage sessions
+        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
+
         # first time in no cookie, redirect to login page
         os.environ['QUERY_STRING'] = 'auth=yes'
         h = parse_session_launcher()
@@ -179,6 +217,37 @@ class TestSessionLauncher(unittest.TestCase):
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],'http://test.url.com')
         del os.environ['HTTP_COOKIE']
+
+        # test SESSION_SCRIPT_MANAGE. First time in (just back from
+        # login delegation page) it starts a completely new
+        # session. The next time it should call the session starter
+        # script with the same sessionid it generated on the first
+        # call and get the same link
+        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=True
+        cadcSessionLauncher.SESSION_SCRIPT=script_test_manage
+        os.environ['QUERY_STRING'] = 'auth=yes&token=abc123'
+        h = parse_session_launcher()
+        sessionid = h['cookies']['sessionid']
+        sessionlink='http://test.url.com?token=yes&sessionid=%s' % sessionid
+        self.assertEqual(h['status'],'303')
+        self.assertEqual(h['location'],sessionlink)
+        del os.environ['QUERY_STRING']
+
+        cookie_next_visit = 'auth=yes; sessionlink="%s"; sessionid=%s' \
+            % (sessionlink,sessionid)
+        # We don't have the token second time in
+        sessionlink = str(sessionlink).replace('token=yes&','')
+        os.environ['HTTP_COOKIE'] = cookie_next_visit
+        os.environ['QUERY_STRING'] = 'auth=yes'
+        h = parse_session_launcher()
+        self.assertEqual(h['cookies']['sessionid'],sessionid)
+        self.assertEqual(h['status'],'303')
+        self.assertEqual(h['location'],sessionlink)
+
+        del os.environ['QUERY_STRING']
+        del os.environ['HTTP_COOKIE']
+        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
+        cadcSessionLauncher.SESSION_SCRIPT=script_success
 
 def run():
     suite = unittest.TestLoader().loadTestsFromTestCase(TestSessionLauncher)
