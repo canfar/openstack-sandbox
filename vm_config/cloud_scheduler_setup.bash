@@ -196,7 +196,7 @@ while true; do
 	-e | --ephemeral-dir) EPHEMERAL_DIR=${2##=}; shift ;;
 	-s | --submitter) SUBMITTER=${2##=}; shift ;;
 	-t | --vm-image-name) VM_IMAGE_NAME=${2##=}; shift ;;
-        -u | --update-cloud-scheduler) UPDATE_CS=true; shift ;;
+        -u | --update-cloud-scheduler) UPDATE_CS=true ;;
 	-h | --help) usage ;;
 	-V | --version) echo ${EXEC_VERSION}; exit ;;
 	--)  shift; break ;; # no more options
