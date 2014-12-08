@@ -12,7 +12,7 @@ CM_HOST_IP="192.168.0.11"
 
 UPDATE_CS=false
 SUBMITTER=${USER}
-VMTYPE=${HOSTNAME}
+VM_IMAGE_NAME=${HOSTNAME}
 
 
 msg() {
@@ -31,7 +31,7 @@ Configure HTCondor for cloud-scheduler on VM execution hosts
   -c, --central-manager     set the central manager hostname (default: ${CM_HOST_NAME})
   -i, --central-manager-ip  set the central manager local IP (default: ${CM_HOST_IP})
   -e, --ephemeral-dir       scratch directory where condor will execute jobs (default: ${EPHEMERAL_DIR})
-  -t, --vm-type             specify the VM type to match condor requirements (default: ${HOSTNAME})
+  -t, --vm-image-name       specify the VM image name (default: ${HOSTNAME})
   -s, --submitter           specify the user submitting the condor jobs (default: ${USER})
   -u, --update-cloud-scheduler update cloud scheduler configuration if set
   -h, --help                display help and exit
@@ -104,7 +104,7 @@ cs_condor_configure() {
 	SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
 	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
 	START = ( Owner == "${SUBMITTER}" )
-	VMType = "${VMTYPE}"
+	VMType = "${VM_IMAGE_NAME}"
 	SUSPEND = FALSE
 	CONTINUE = TRUE
 	PREEMPT = FALSE
@@ -180,7 +180,7 @@ OPTS=$(getopt \
     -l central-manager-ip: \
     -l ephemeral-dir: \
     -l submitter: \
-    -l vm-type: \
+    -l vm-image-name: \
     -l update-cloud-scheduler \
     -l help \
     -l version \
@@ -195,7 +195,7 @@ while true; do
 	-i | --central-manager-ip) CM_HOST_IP=${2##=}; shift ;;
 	-e | --ephemeral-dir) EPHEMERAL_DIR=${2##=}; shift ;;
 	-s | --submitter) SUBMITTER=${2##=}; shift ;;
-	-t | --vm-type) VMTYPE=${2##=}; shift ;;
+	-t | --vm-image-name) VM_IMAGE_NAME=${2##=}; shift ;;
         -u | --update-cloud-scheduler) UPDATE_CS=true; shift ;;
 	-h | --help) usage ;;
 	-V | --version) echo ${EXEC_VERSION}; exit ;;
