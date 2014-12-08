@@ -4,7 +4,7 @@
 # cloud scheduler / OpenStack parameters:
 # image_uri:    uuid
 #                or
-#               tenant_name/image_name
+#               tenant_name:image_name
 # flavor:       hardware profile for the cloud
 #
 # This script validates these inputs and writes a validated script
