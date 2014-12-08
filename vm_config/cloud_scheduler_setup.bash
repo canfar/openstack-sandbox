@@ -103,8 +103,8 @@ cs_condor_configure() {
 	MaxJobRetirementTime = 3600 * 24 * 2
 	SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
 	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
-	START = ( Owner == "${SUBMITTER}" )
-	VMType = "${VM_IMAGE_NAME}"
+	START = ( Owner == ${SUBMITTER} )
+	VMType = ${VM_IMAGE_NAME}
 	SUSPEND = FALSE
 	CONTINUE = TRUE
 	PREEMPT = FALSE
