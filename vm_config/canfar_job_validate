@@ -117,17 +117,18 @@ runcmd:
       cat - > %s <<'EOF'
 ''' % (pubkey_content,ephemeral_dir,outputscript)
 
-    script_arguments = '--update-cloud-scheduler'
+    script_arguments = ", '--update-cloud-scheduler'"
     if image_name:
         script_arguments = script_arguments + \
-                           ' --vm-image-name="%s"' % image_name
+                           ", '--vm-image-name=\"%s\"'" % image_name
     if submitter:
-        script_arguments = script_arguments + ' --submitter="%s"' % submitter
+        script_arguments = script_arguments + \
+                           ", '--submitter=\"%s\"'" % submitter
 
     end_text = '''
       EOF
   - [ 'chmod', '0755', '%s' ]
-  - [ '%s', '%s' ]
+  - [ '%s'%s ]
 ''' % (outputscript,outputscript,script_arguments)
 
     f = open(output_yml,'w')
