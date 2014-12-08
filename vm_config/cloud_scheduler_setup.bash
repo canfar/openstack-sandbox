@@ -2,13 +2,18 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.1
+EXEC_VERSION=0.2_beta
 
 EPHEMERAL_DIR="/ephemeral"
 
 CM_HOST_NAME="batch.canfar.net"
 # need to specify local ip because no local dns on nefos
 CM_HOST_IP="192.168.0.11"
+
+UPDATE_CS=false
+SUBMITTER=${USER}
+VMTYPE=${HOSTNAME}
+
 
 msg() {
     echo " >> ${EXEC_NAME}: $1"
@@ -26,6 +31,8 @@ Configure HTCondor for cloud-scheduler on VM execution hosts
   -c, --central-manager     set the central manager hostname (default: ${CM_HOST_NAME})
   -i, --central-manager-ip  set the central manager local IP (default: ${CM_HOST_IP})
   -e, --ephemeral-dir       scratch directory where condor will execute jobs (default: ${EPHEMERAL_DIR})
+  -t, --vm-type             specify the VM type to match condor requirements (default: ${HOSTNAME})
+  -s, --submitter           specify the user submitting the condor jobs (default: ${USER})
   -u, --update-cloud-scheduler update cloud scheduler configuration if set
   -h, --help                display help and exit
   -v, --version             output version information and exit
@@ -85,15 +92,6 @@ cs_condor_configure() {
 	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
 	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
     fi
-    # hack because of bug cloud scheduler does not update VMType and START anymore
-    # guess info from subname to match requirements
-    # vmtype can have '-' in the name but assume cloud name and user don't
-    local uuid=${HOSTNAME:((${#HOSTNAME} - 36))}
-    local name=${HOSTNAME%-${uuid}}
-    local cloud=${name%%-*}
-    name=${name#${cloud}-}
-    local submitter=${name%%-*}
-    local vmtype=${name#${submitter}-}
     cat > ${condorconfig} <<-EOF
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
@@ -105,8 +103,8 @@ cs_condor_configure() {
 	MaxJobRetirementTime = 3600 * 24 * 2
 	SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
 	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
-	START = ( Owner == "${submitter}" )
-	VMType = "${vmtype}"
+	START = ( Owner == "${SUBMITTER}" )
+	VMType = "${VMTYPE}"
 	SUSPEND = FALSE
 	CONTINUE = TRUE
 	PREEMPT = FALSE
@@ -160,24 +158,29 @@ cs_setup_etc_hosts() {
 }
 
 cs_remove_selinux() {
-    # not friendly with condor in our configuration
-    sed -i -e 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
-    setenforce 0
+    # selinux not friendly with condor in our configuration
+    if getenforce 2> /dev/null && [[ -e /etc/selinux/config ]]; then
+	msg "disabling selinux"
+	sed -i -e 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
+	setenforce 0
+    fi
 }
-
 
 cs_fix_resolv_conf() {
     # frequent dns issues with openstack on nefos
     # adding google one
+    msg "adding google dns"
     sed -i -e '1inameserver 8.8.8.8' /etc/resolv.conf
 }
 
 # Store all options
 OPTS=$(getopt \
-    -o c:i:e:uhv \
+    -o c:i:e:s:t:uhv \
     -l central-manager: \
     -l central-manager-ip: \
     -l ephemeral-dir: \
+    -l submitter: \
+    -l vm-type: \
     -l update-cloud-scheduler \
     -l help \
     -l version \
@@ -185,14 +188,14 @@ OPTS=$(getopt \
 
 eval set -- "${OPTS}"
 
-UPDATE_CS=false
-
 # Process options
 while true; do
     case "$1" in
 	-c | --central-manager) CM_HOST_NAME=${2##=}; shift ;;
 	-i | --central-manager-ip) CM_HOST_IP=${2##=}; shift ;;
 	-e | --ephemeral-dir) EPHEMERAL_DIR=${2##=}; shift ;;
+	-s | --submitter) SUBMITTER=${2##=}; shift ;;
+	-t | --vm-type) VMTYPE=${2##=}; shift ;;
         -u | --update-cloud-scheduler) UPDATE_CS=true; shift ;;
 	-h | --help) usage ;;
 	-V | --version) echo ${EXEC_VERSION}; exit ;;
