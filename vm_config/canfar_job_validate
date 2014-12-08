@@ -2,9 +2,9 @@
 #
 # A user provides a bare condor submission file, as well as some additional
 # cloud scheduler / OpenStack parameters:
-# image_uri:    canfar:uuid
-#                    or
-#               canfar:tenant_name/image_name
+# image_uri:    uuid
+#                or
+#               tenant_name/image_name
 # flavor:       hardware profile for the cloud
 #
 # This script validates these inputs and writes a validated script
@@ -104,10 +104,11 @@ try:
         raise Exception("Could not read the contents of "+jobfile)
 
     for param in param_disallow:
-        regex = param+"\s*=.*"
+        par_regex = param
         if param[0] == '+':
             # Parameters that start with + need to be escaped in regex
-            regex = '\\'+regex
+            par_regex = '\\'+par_regex
+        regex = "^[^#]*"+par_regex+"\s*=.*$"
         match = re.findall(regex,jobfile_data,re.MULTILINE)
 
         if match:
