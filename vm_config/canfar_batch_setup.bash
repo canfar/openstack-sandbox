@@ -80,7 +80,7 @@ condor_install() {
 }
 
 # configure condor for cloud scheduler
-cs_condor_configure() {
+canfar_condor_configure() {
     msg "updating condor config"
     type -P condor_config_val > /dev/null || die "condor does not seem to be installed"
     local condorconfig="$(condor_config_val LOCAL_CONFIG_DIR)"
@@ -133,7 +133,7 @@ cs_condor_configure() {
     service condor restart
 }
 
-cs_setup_etc_hosts() {
+canfar_setup_etc_hosts() {
     # set up condor ccb only if private networking is available
     local etc_hosts=${1:-/etc/hosts}
     local priv_ip=$(ip -o -4 addr show eth0 | awk -F '[ /]+' '/global/ {print $4}')
@@ -156,7 +156,7 @@ cs_setup_etc_hosts() {
     fi
 }
 
-cs_remove_selinux() {
+canfar_remove_selinux() {
     # selinux not friendly with condor in our configuration
     # enabled on RHEL images by default
     if getenforce 2> /dev/null && [[ $(getenforce) != Disabled ]]; then
@@ -167,7 +167,7 @@ cs_remove_selinux() {
     fi
 }
 
-cs_disable_firewall() {
+canfar_disable_firewall() {
     # usually only needed on centos6
     # ultimately should be more robust using iptables on condor ports
     if service iptables status 2> /dev/null; then
@@ -180,7 +180,7 @@ cs_disable_firewall() {
     fi
 }
 
-cs_fix_resolv_conf() {
+canfar_fix_resolv_conf() {
     # frequent dns issues with openstack on nefos
     # adding google one
     msg "adding google dns"
@@ -221,11 +221,11 @@ done
 
 export PATH="/sbin:/usr/sbin:${PATH}"
 
-cs_fix_resolv_conf
+canfar_fix_resolv_conf
 condor_install
 
 if [[ ${UPDATE_CS} == true ]]; then
-   cs_setup_etc_hosts
-   cs_condor_configure
-   cs_disable_firewall
+   canfar_setup_etc_hosts
+   canfar_condor_configure
+   canfar_disable_firewall
 fi

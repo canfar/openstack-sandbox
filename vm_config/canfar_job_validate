@@ -55,7 +55,7 @@ auth = {'username':'',
 # where to find some common inputs
 sharepath = '/usr/local/share/canfar'
 canfarcspubkey = sharepath+'/canfarcs_id_rsa.pub'
-confscript = sharepath+'/cloud_scheduler_setup.bash'
+confscript = sharepath+'/canfar_batch_setup.bash'
 
 # Location for per-user cloud config YAML files. The actual file name
 # is a uuid to avoid clashes (since these are user- and job-specific)
@@ -83,7 +83,7 @@ def make_cloud_config(inputscript,pubkey,output_yml,
     #       no "write_files" module (hence multi-line cat shenanigans in
     #       runcmd to get the configuration script into the VM and execute
     #       it)
-    # - image_name and submitter are used by cloud_scheduler_setup.bash to
+    # - image_name and submitter are used by canfar_batch_setup.bash to
     #   set the VMType. If not specified defaults to $HOSTNAME and $USER 
 
     # the full output path name of the configuration script when copied
