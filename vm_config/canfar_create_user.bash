@@ -65,5 +65,5 @@ while true; do
     shift
 done
 
-read -p "CANFAR username: " usrname
+read -p "CANFAR username: " username
 create_user ${username}
