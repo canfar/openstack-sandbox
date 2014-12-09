@@ -1,13 +1,10 @@
 #!/bin/sh
 # Example of a session script that is called by cadcSessionLauncher.py
 
+SESSIONID=$1
+TOKEN=$2
 
-TOKEN=$1
-
-# Uncomment this block to generate bad exit status
-#echo "We had a problem."
-#echo "An error message that will appear in the web server log." >&2
-#exit 1
+echo "Starting session: ${SESSIONID}" >&2
 
 # anonymous URL
 session_url='http://google.com'
@@ -16,13 +13,13 @@ if [ ! -z "$TOKEN" ]; then
     # This is where you might perform VOSpace operations (vcp, mountvofs...)
     # using the --token="$TOKEN" parameter. In this example we extract the
     # canfar user name from the token string, and use vls on the portion
-    # of VOS space for which the token should be scoped to validate the
+    # of VOSpace for which the token should be scoped to validate the
     # identity of the user
     part=`echo ${TOKEN} | cut -d"&" -f1`
     canfaruser=`echo $part | cut -d"=" -f2`
     vls vos:${canfaruser} --token="${TOKEN}" >& /dev/null
 
-    # Note in the user log whether user was validated or not
+    # Note in the web server log whether user was validated or not
     if [ "$?" == 0 ]; then
         # authenticated URL if validated user
         echo "user ${canfaruser} validated" >&2
@@ -33,9 +30,15 @@ if [ ! -z "$TOKEN" ]; then
         exit 1
     fi
 
+else
+    # Here we would need some intelligence to check whether $SESSIONID
+    # already exists, and return the old URL if needed
 
+    echo "Need additional intelligence to determine if this is a new or old session" >&2
+
+    echo $session_url
 fi
 
-echo $session_url
+
 
 exit 0

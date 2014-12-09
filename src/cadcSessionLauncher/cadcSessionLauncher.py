@@ -138,22 +138,15 @@ def has_authenticated(form):
 def start_new_session(message=None):
     global _form, _authenticated, _expiration, _sessionid
 
-    # If session starter handles session management (SESSION_SCRIPT_MANAGE)
-    # validate an existing sessionid (UUID), or generate a new one:
-    if SESSION_SCRIPT_MANAGE:
-        try:
-            # See if we have an existing valid uuid
-            sessionid = str(uuid.UUID(_sessionid))
-        except:
-            # Create a new one
-            sessionid = str(uuid.uuid4())
-    else:
-        # By default no sessionid used
-        sessionid = None
-
     print >> sys.stderr, "New session:", message
     cookie = Cookie.SimpleCookie()
     token = ''
+
+    try:
+        # See if we have an existing valid uuid
+        sessionid = str(uuid.UUID(_sessionid))
+    except:
+        sessionid = None
 
     if _authenticated:
         # Authenticated access requires CADC credentials.
@@ -170,6 +163,11 @@ def start_new_session(message=None):
         else:
             html_redirect(LOGIN_PAGE)
             return
+
+    # If session starter handles session management (SESSION_SCRIPT_MANAGE)
+    # generate a new sessionid if needed
+    if SESSION_SCRIPT_MANAGE and not sessionid:
+        sessionid = str(uuid.uuid4())
 
     # We have now authenticated, or this is an anonymous session.
     # Execute the session script. This should display URL to stdout.
@@ -262,8 +260,12 @@ def session_launcher():
 
         # --- cookie retrieved, we have been here before ---
         if new_session_requested(_form):
+            # want to create a new _sessionid
+            _sessionid = None
             start_new_session(message='Requested.')
         elif has_authenticated(_form):
+            # want to create a new _sessionid
+            _sessionid = None
             start_new_session(message='Token re-authentication.')
         elif SESSION_SCRIPT_MANAGE:
             start_new_session(message='Session starter manages sessions')

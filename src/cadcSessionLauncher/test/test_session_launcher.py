@@ -123,7 +123,9 @@ class TestSessionLauncher(unittest.TestCase):
         # test SESSION_SCRIPT_MANAGE. First time in it starts
         # a completely new session. The next time it should call
         # the session starter script with the same sessionid it
-        # generated on the first call and get the same link
+        # generated on the first call and get the same link. Final
+        # time we request a new session, so we should get a new
+        # sessionid
         cadcSessionLauncher.SESSION_SCRIPT_MANAGE=True
         cadcSessionLauncher.SESSION_SCRIPT=script_test_manage
         os.environ['QUERY_STRING'] = 'new=yes'
@@ -132,6 +134,7 @@ class TestSessionLauncher(unittest.TestCase):
         sessionlink='http://test.url.com?sessionid=%s' % sessionid
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],sessionlink)
+        del os.environ['QUERY_STRING']
 
         cookie_next_visit = 'sessionlink="%s"; sessionid=%s' \
             % (sessionlink,sessionid)
@@ -140,6 +143,12 @@ class TestSessionLauncher(unittest.TestCase):
         self.assertEqual(h['cookies']['sessionid'],sessionid)
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],sessionlink)
+
+        os.environ['QUERY_STRING'] = 'new=yes'
+        h = parse_session_launcher()
+        self.assertNotEqual(h['cookies']['sessionid'],sessionid)
+        self.assertEqual(h['status'],'303')
+        self.assertNotEqual(h['location'],sessionlink)
 
         del os.environ['QUERY_STRING']
         del os.environ['HTTP_COOKIE']
@@ -218,13 +227,22 @@ class TestSessionLauncher(unittest.TestCase):
         self.assertEqual(h['location'],'http://test.url.com')
         del os.environ['HTTP_COOKIE']
 
-        # test SESSION_SCRIPT_MANAGE. First time in (just back from
-        # login delegation page) it starts a completely new
-        # session. The next time it should call the session starter
-        # script with the same sessionid it generated on the first
-        # call and get the same link
+        # test SESSION_SCRIPT_MANAGE. First time redirect is to login
+        # page.  Next time (just back from login delegation page) it
+        # starts a completely new session. The next time it should
+        # call the session starter script with the same sessionid it
+        # generated on the first call and get the same link.  Final
+        # time we request a new session, so we should get a new
+        # sessionid despite cookie.
         cadcSessionLauncher.SESSION_SCRIPT_MANAGE=True
         cadcSessionLauncher.SESSION_SCRIPT=script_test_manage
+
+        os.environ['QUERY_STRING'] = 'new=yes&auth=yes'
+        h = parse_session_launcher()
+        self.assertEqual(h['status'],'303')
+        self.assertEqual(h['location'],cadcSessionLauncher.LOGIN_PAGE)
+        del os.environ['QUERY_STRING']
+
         os.environ['QUERY_STRING'] = 'auth=yes&token=abc123'
         h = parse_session_launcher()
         sessionid = h['cookies']['sessionid']
@@ -243,6 +261,12 @@ class TestSessionLauncher(unittest.TestCase):
         self.assertEqual(h['cookies']['sessionid'],sessionid)
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],sessionlink)
+
+        os.environ['QUERY_STRING'] = 'auth=yes&token=abc123'
+        h = parse_session_launcher()
+        self.assertNotEqual(h['cookies']['sessionid'],sessionid)
+        self.assertEqual(h['status'],'303')
+        self.assertNotEqual(h['location'],sessionlink)
 
         del os.environ['QUERY_STRING']
         del os.environ['HTTP_COOKIE']
