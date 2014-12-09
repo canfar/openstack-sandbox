@@ -2,7 +2,7 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.2_beta
+EXEC_VERSION=0.2_beta2
 
 EPHEMERAL_DIR="/ephemeral"
 
@@ -14,13 +14,12 @@ UPDATE_CS=false
 SUBMITTER=${USER}
 VM_IMAGE_NAME=${HOSTNAME}
 
-
 msg() {
     echo " >> ${EXEC_NAME}: $1"
 }
 
 die() {
-    echo "${EXEC_NAME}: $1" 1>&2
+    echo "${EXEC_NAME} Error: $1" 1>&2
     exit 1
 }
 
@@ -159,10 +158,25 @@ cs_setup_etc_hosts() {
 
 cs_remove_selinux() {
     # selinux not friendly with condor in our configuration
-    if getenforce 2> /dev/null && [[ -e /etc/selinux/config ]]; then
+    # enabled on RHEL images by default
+    if getenforce 2> /dev/null && [[ $(getenforce) != Disabled ]]; then
 	msg "disabling selinux"
-	sed -i -e 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
+	[[ -e /etc/selinux/config ]] && \
+	    sed -i -e 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
 	setenforce 0
+    fi
+}
+
+cs_disable_firewall() {
+    # usually only needed on centos6
+    # ultimately should be more robust using iptables on condor ports
+    if service iptables status 2> /dev/null; then
+	msg "disabling IPV4 firewall for condor"
+	service iptables stop
+    fi
+    if service ip6tables status 2> /dev/null; then
+	msg "disabling IPV6 firewall for condor"
+	service ip6tables stop
     fi
 }
 
@@ -213,4 +227,5 @@ condor_install
 if [[ ${UPDATE_CS} == true ]]; then
    cs_setup_etc_hosts
    cs_condor_configure
+   cs_disable_firewall
 fi
