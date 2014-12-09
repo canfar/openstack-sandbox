@@ -28,15 +28,15 @@ create_user() {
     local sshdir=/home/${username}/.ssh
     useradd -m -s /bin/bash -d /home/${username} ${username} || die "failed to create user ${username}"
     # centos || ubuntu proof
-    usermod -a -G wheel ${username} || usermod -a -G sudo ${username}
-    msg "Enter your CANFAR password below"
+    usermod -a -G wheel ${username} 2> /dev/null || usermod -a -G sudo ${username}
+    msg "Enter the CANFAR password for this user below"
     passwd ${username}
     mkdir -p ${sshdir}
     chmod 700 ${sshdir}
     # ouch - nasty
     local ciuser    
     for ciuser in cloud-user ubuntu centos ec2-user; do
-	cp /home/${ciuser}/.ssh/authorized_keys ${sshdir} && break
+	cp /home/${ciuser}/.ssh/authorized_keys ${sshdir} 2> /dev/null && break
     done
     chown -R ${username}:${username} ${sshdir}
     chmod 600 ${sshdir}/authorized_keys
@@ -65,5 +65,6 @@ while true; do
     shift
 done
 
-read -p "CANFAR username: " username
+username=$1
+[[ -z ${username} ]] && read -p "Enter the CANFAR username for this new user: " username
 create_user ${username}
