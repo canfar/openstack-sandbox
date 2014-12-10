@@ -64,7 +64,7 @@ try:
 except:
     print "Error obtaining user name from $USER"
     sys.exit(1)
-confdir = '/tmp/canfar'
+confdir = '/var/cache/canfar'
 conf_yml = '%s/%s_%s.yml' % (confdir,submitter,uuid.uuid4())
 
 
