@@ -85,6 +85,7 @@ __version__ = '0.1'
 _form = None             # query parameters
 _authenticated = False   # True if authenticated, False if anonymous
 _expiration = None       # session expiry
+_sessionid = None        # UUID for session
 
 # --- some helpers for clarity ---
 def html_terminate_header():
@@ -133,8 +134,6 @@ def has_authenticated(form):
         return False
 
 # --- start a new session ---
-# If a sessionid is specified we are trying to return to an old
-# session which is handled by the session starter script.
 def start_new_session(message=None):
     global _form, _authenticated, _expiration, _sessionid
 
