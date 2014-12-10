@@ -16,6 +16,7 @@ import argparse
 import collections
 import errno
 import keystoneclient.v2_0.client as ksclient
+from keystoneclient.apiclient import exceptions as keystone_exceptions
 import novaclient.v1_1.client as nclient
 import glanceclient.v2.client as glclient
 from glanceclient.exc import HTTPConflict
@@ -373,6 +374,9 @@ try:
 
 except Exception as E:
     print "ERROR:",E
+    if isinstance(E, keystone_exceptions.Unauthorized):
+        print "Did you source a valid openrc file? (i.e., are OS_* environment variables set?)\n" + \
+            "Check for errors in your credentials."
     sys.exit(1)
 
 jobfile = '''Requirements = VMType =?= "%s" && Arch == "x86_64"
