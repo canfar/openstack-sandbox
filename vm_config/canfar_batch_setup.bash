@@ -40,7 +40,7 @@ Configure HTCondor for cloud-scheduler on VM execution hosts
 }
 
 # install condor for rpm or deb distros
-condor_install() {
+canfar_condor_install() {
     condor_version > /dev/null 2>&1 && msg "condor is already installed" && return 0
     msg "installing condor"
     # determine os
@@ -222,7 +222,8 @@ done
 export PATH="/sbin:/usr/sbin:${PATH}"
 
 canfar_fix_resolv_conf
-condor_install
+canfar_remove_selinux
+canfar_condor_install
 
 if [[ ${UPDATE_CS} == true ]]; then
    canfar_setup_etc_hosts
