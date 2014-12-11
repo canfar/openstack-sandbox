@@ -149,8 +149,8 @@ canfar_setup_etc_hosts() {
     fi
     addstr="# Added for condor to specify central manager of local network"
     sed -i -e "/${CM_HOST_NAME}/d" ${etc_hosts}
-    if grep -q "${CM_HOST_IP}" ${etc_hosts} ; then	
-	sed -i -e "s:[[:space:]]${CM_HOST_IP}.*:${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}:" ${etc_hosts}
+    if grep -q "${CM_HOST_IP}[[:space:]]*" ${etc_hosts} ; then	
+	sed -i -e "s:[[:space:]]${CM_HOST_IP}[[:space:]]*.*:${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}:" ${etc_hosts}
     else
 	echo "${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}" >> ${etc_hosts}
     fi
@@ -159,7 +159,7 @@ canfar_setup_etc_hosts() {
 canfar_remove_selinux() {
     # selinux not friendly with condor in our configuration
     # enabled on RHEL images by default
-    if getenforce 2> /dev/null && [[ $(getenforce) != Disabled ]]; then
+    if getenforce > /dev/null 2>&1 && [[ $(getenforce) != Disabled ]]; then
 	msg "disabling selinux"
 	[[ -e /etc/selinux/config ]] && \
 	    sed -i -e 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
