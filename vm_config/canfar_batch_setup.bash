@@ -2,7 +2,7 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.2_beta2
+EXEC_VERSION=0.2_rc
 
 EPHEMERAL_DIR="/ephemeral"
 
@@ -91,10 +91,11 @@ canfar_condor_configure() {
 	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
 	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
     fi
+    local execdir=${EPHEMERAL_DIR}/tmp
     cat > ${condorconfig} <<-EOF
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
-	EXECUTE = ${EPHEMERAL_DIR}
+	EXECUTE = ${execdir}
 	CONDOR_HOST = ${CM_HOST_NAME}
 	ALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
 	CCB_ADDRESS = \$(CONDOR_HOST)
@@ -119,9 +120,9 @@ canfar_condor_configure() {
 	######################################################
 	EOF
     echo "${CM_HOST_NAME}" > /etc/condor/central_manager
-    [[ -d ${EPHEMERAL_DIR} ]] || mkdir -p ${EPHEMERAL_DIR}
-    chown condor:condor ${EPHEMERAL_DIR}
-    chmod ugo+rwxt ${EPHEMERAL_DIR}
+    [[ -d ${execdir} ]] || mkdir -p ${execdir}
+    chown condor:condor ${execdir}
+    chmod ugo+rwxt ${execdir}
     msg "restart condor services to include configuration changes"
     # on CentOS 7 /var/lock/condor is incorrectly owned by root
     if condor_version | grep -q RedHat_7; then
@@ -187,6 +188,21 @@ canfar_fix_resolv_conf() {
     sed -i -e '1inameserver 8.8.8.8' /etc/resolv.conf
 }
 
+canfar_setup_ephemeral() {
+    local cachedir=${EPHEMERAL_DIR}/cache
+    local execdir=${EPHEMERAL_DIR}/exec
+    if ! grep -q ${EPHEMERAL_DIR} /etc/mtab && grep -q /mnt /etc/fstab; then
+	sed -i -e "s:/mnt:${EPHEMERAL_DIR}:g" /etc/fstab
+	umount /mnt
+	mount ${EPHEMERAL_DIR}
+    fi
+    if grep -q ${EPHEMERAL_DIR} /etc/mtab; then
+	msg "setting up ephemeral partition"
+	mkdir -p ${cachedir} ${execdir}	
+	chmod 777 ${cachedir} ${execdir}
+    fi
+}
+
 # Store all options
 OPTS=$(getopt \
     -o c:i:e:s:t:uhv \
@@ -222,6 +238,7 @@ done
 export PATH="/sbin:/usr/sbin:${PATH}"
 
 canfar_fix_resolv_conf
+canfar_setup_ephemeral
 canfar_remove_selinux
 canfar_condor_install
 
