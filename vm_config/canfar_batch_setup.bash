@@ -91,7 +91,7 @@ canfar_condor_configure() {
 	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
 	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
     fi
-    local execdir=${EPHEMERAL_DIR}/tmp
+    local execdir=${EPHEMERAL_DIR}/condor
     cat > ${condorconfig} <<-EOF
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
@@ -189,18 +189,16 @@ canfar_fix_resolv_conf() {
 }
 
 canfar_setup_ephemeral() {
-    local cachedir=${EPHEMERAL_DIR}/cache
-    local execdir=${EPHEMERAL_DIR}/exec
-    if ! grep -q ${EPHEMERAL_DIR} /etc/mtab && grep -q /mnt /etc/fstab; then
-	sed -i -e "s:/mnt:${EPHEMERAL_DIR}:g" /etc/fstab
-	umount /mnt
-	mount ${EPHEMERAL_DIR}
+    msg "setting up ephemeral partition"
+    if ! grep -q ${EPHEMERAL_DIR} /etc/mtab; then
+	 if grep /mnt /etc/mtab | grep -q ephemeral; then
+	     sed -i -e "s:/mnt:${EPHEMERAL_DIR}:g" /etc/fstab
+	     umount /mnt
+	 fi
+	 mkdir -p ${EPHEMERAL_DIR}
+	 mount -a
     fi
-    if grep -q ${EPHEMERAL_DIR} /etc/mtab; then
-	msg "setting up ephemeral partition"
-	mkdir -p ${cachedir} ${execdir}	
-	chmod 777 ${cachedir} ${execdir}
-    fi
+    chmod 777 ${EPHEMERAL_DIR}
 }
 
 # Store all options
