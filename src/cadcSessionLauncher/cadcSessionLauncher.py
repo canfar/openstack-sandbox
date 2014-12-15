@@ -267,6 +267,14 @@ def session_launcher():
             _sessionid = None
             start_new_session(message='Token re-authentication.')
         elif SESSION_SCRIPT_MANAGE:
+            # If session type doesn't match cookie, remove sessionid so
+            # that we start a completely new session
+            previous_session_authenticated = ('auth' in cookie and \
+                                                  cookie['auth'].value == \
+                                                  'yes')
+            if _authenticated != previous_session_authenticated:
+                _sessionid = None
+
             start_new_session(message='Session starter manages sessions')
         else:
             # CGI manages sessions. Handle stored session link here
