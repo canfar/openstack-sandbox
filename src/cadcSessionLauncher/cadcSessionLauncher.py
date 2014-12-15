@@ -254,6 +254,11 @@ def session_launcher():
     try:
         cookie = Cookie.SimpleCookie(os.environ["HTTP_COOKIE"])
 
+        # was stored previous session authenticated?
+        last_authenticated = False
+        if 'auth' in cookie and cookie['auth'].value == 'yes':
+            last_authenticated = True
+
         if 'sessionid' in cookie:
             _sessionid = cookie['sessionid'].value
 
@@ -268,24 +273,19 @@ def session_launcher():
             start_new_session(message='Token re-authentication.')
         elif SESSION_SCRIPT_MANAGE:
             # If session type doesn't match cookie, remove sessionid so
-            # that we start a completely new session
-            previous_session_authenticated = ('auth' in cookie and \
-                                                  cookie['auth'].value == \
-                                                  'yes')
-            if _authenticated != previous_session_authenticated:
+            # that we tell session starter to start a completely new session
+            if _authenticated != last_authenticated:
                 _sessionid = None
-
             start_new_session(message='Session starter manages sessions')
         else:
             # CGI manages sessions. Handle stored session link here
             if 'sessionlink' in cookie:
-                previous_session_authenticated = ('auth' in cookie and \
-                                                      cookie['auth'].value == \
-                                                      'yes')
-                if _authenticated == previous_session_authenticated:
+                if _authenticated == last_authenticated:
+                    # redirect to stored session if same session time
                     html_redirect(cookie['sessionlink'].value)
                     return
                 else:
+                    # otherwise new session
                     start_new_session(message=\
                                           'Requested session type does not ' +\
                                           'match stored session type.')
