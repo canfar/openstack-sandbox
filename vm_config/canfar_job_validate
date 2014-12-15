@@ -383,6 +383,7 @@ jobfile = '''Requirements = VMType =?= "%s" && Arch == "x86_64"
 +VMAMI          = "canfar:%s"
 +VMInstanceType = "canfar:%s"
 +VMAMIConfig    = "%s"
++VMKeepAlive    = 5
 ''' % (vmtype,image_uuid,flavor,conf_yml) + jobfile_data
 
 print jobfile
