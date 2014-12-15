@@ -140,6 +140,8 @@ def start_new_session(message=None):
     print >> sys.stderr, "New session:", message
     cookie = Cookie.SimpleCookie()
     token = _token
+    token_new = False
+    sessionid_new = False
 
     try:
         # See if we have an existing valid uuid
@@ -158,6 +160,7 @@ def start_new_session(message=None):
         #   - otherwise we need to direct the user to the delefation pahge
         if has_authenticated(_form):
             token = _form.getvalue('token')
+            token_new = True
         elif SESSION_SCRIPT_MANAGE and sessionid and token:
             pass
         else:
@@ -168,6 +171,7 @@ def start_new_session(message=None):
     # generate a new sessionid if needed
     if SESSION_SCRIPT_MANAGE and not sessionid:
         sessionid = str(uuid.uuid4())
+        sessionid_new = True
 
     # We have now authenticated, or this is an anonymous session.
     # Execute the session script. This should display URL to stdout.
@@ -203,23 +207,22 @@ def start_new_session(message=None):
             print >> sys.stderr, SESSION_SCRIPT+' stderr:\n'+err
         cookie['sessionlink'] = out
 
-    # Store session UUID
-    if sessionid:
+    # Store new session UUID
+    if sessionid_new:
         cookie['sessionid'] = sessionid
+        cookie['sessionid']['expires'] = _expiration
 
-    # Store token
-    if token:
+    # Store new token
+    if token_new:
         cookie['token'] = token
+        cookie['token']['expires'] = _expiration
 
     # Store session type
     if _authenticated:
         cookie['auth'] = 'yes'
     else:
         cookie['auth'] = 'no'
-
-    # cookie expiration
-    for c in cookie:
-        cookie[c]['expires'] = _expiration
+    cookie['auth']['expires'] = _expiration
 
     print cookie.output()
 
@@ -274,11 +277,11 @@ def session_launcher():
 
         # --- cookie retrieved, we have been here before ---
         if new_session_requested(_form):
-            # want to create a new _sessionid
+            # Caller requests new session / token.
             _sessionid = None
             start_new_session(message='Requested.')
         elif has_authenticated(_form):
-            # want to create a new _sessionid
+            # Just back from login page. New sessionid / token.
             _sessionid = None
             start_new_session(message='Token re-authentication.')
         elif SESSION_SCRIPT_MANAGE:

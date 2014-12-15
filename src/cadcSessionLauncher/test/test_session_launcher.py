@@ -140,7 +140,6 @@ class TestSessionLauncher(unittest.TestCase):
             % (sessionlink,sessionid)
         os.environ['HTTP_COOKIE'] = cookie_next_visit
         h = parse_session_launcher()
-        self.assertEqual(h['cookies']['sessionid'],sessionid)
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],sessionlink)
 
@@ -257,7 +256,6 @@ class TestSessionLauncher(unittest.TestCase):
         os.environ['HTTP_COOKIE'] = cookie_next_visit
         os.environ['QUERY_STRING'] = 'auth=yes'
         h = parse_session_launcher()
-        self.assertEqual(h['cookies']['sessionid'],sessionid)
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],sessionlink)
 
