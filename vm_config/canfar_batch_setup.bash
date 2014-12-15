@@ -121,6 +121,7 @@ canfar_condor_configure() {
 	EOF
     echo "${CM_HOST_NAME}" > /etc/condor/central_manager
     [[ -d ${execdir} ]] || mkdir -p ${execdir}
+    chown condor:condor ${EPHEMERAL_DIR}
     chown condor:condor ${execdir}
     chmod ugo+rwxt ${execdir}
     msg "restart condor services to include configuration changes"
