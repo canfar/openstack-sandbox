@@ -140,7 +140,6 @@ class TestSessionLauncher(unittest.TestCase):
             % (sessionlink,sessionid)
         os.environ['HTTP_COOKIE'] = cookie_next_visit
         h = parse_session_launcher()
-        self.assertEqual(h['cookies']['sessionid'],sessionid)
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],sessionlink)
 
@@ -251,14 +250,12 @@ class TestSessionLauncher(unittest.TestCase):
         self.assertEqual(h['location'],sessionlink)
         del os.environ['QUERY_STRING']
 
-        cookie_next_visit = 'auth=yes; sessionlink="%s"; sessionid=%s' \
+        cookie_next_visit = 'auth=yes; sessionlink="%s"; sessionid=%s; token=abc123' \
             % (sessionlink,sessionid)
-        # We don't have the token second time in
-        sessionlink = str(sessionlink).replace('token=yes&','')
+        # The second time in we get redirected to same session
         os.environ['HTTP_COOKIE'] = cookie_next_visit
         os.environ['QUERY_STRING'] = 'auth=yes'
         h = parse_session_launcher()
-        self.assertEqual(h['cookies']['sessionid'],sessionid)
         self.assertEqual(h['status'],'303')
         self.assertEqual(h['location'],sessionlink)
 
