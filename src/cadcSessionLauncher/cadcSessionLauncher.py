@@ -264,7 +264,7 @@ def session_launcher():
     try:
         cookie = Cookie.SimpleCookie(os.environ["HTTP_COOKIE"])
 
-        # was stored previous session authenticated?
+        # obtain previous session information from cookie
         last_authenticated = False
         if 'auth' in cookie and cookie['auth'].value == 'yes':
             last_authenticated = True
@@ -272,7 +272,7 @@ def session_launcher():
         if 'sessionid' in cookie:
             _sessionid = cookie['sessionid'].value
 
-        if 'token' in cookie:
+        if 'token' in cookie and _authenticated:
             _token = cookie['token'].value
 
         # --- cookie retrieved, we have been here before ---
