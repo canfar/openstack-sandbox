@@ -135,11 +135,11 @@ def has_authenticated(form):
 
 # --- start a new session ---
 def start_new_session(message=None):
-    global _form, _authenticated, _expiration, _sessionid
+    global _form, _authenticated, _expiration, _sessionid, _token
 
     print >> sys.stderr, "New session:", message
     cookie = Cookie.SimpleCookie()
-    token = ''
+    token = _token
 
     try:
         # See if we have an existing valid uuid
@@ -151,13 +151,14 @@ def start_new_session(message=None):
         # Authenticated access requires CADC credentials.
         #   - If the form has a token in it, we just came back from
         #     the delegation login page so we grab the token
-        #   - if we have a sessionid and SESSION_SCRIPT_MANAGE set, we
-        #     have already authenticated. We just continue and let the
-        #     session starter script reconnect us\
+        #   - if we have sessionid and token cookies, and
+        #     SESSION_SCRIPT_MANAGE set, we have already
+        #     authenticated. We just continue and let the session
+        #     starter script reconnect us
         #   - otherwise we need to direct the user to the delefation pahge
         if has_authenticated(_form):
             token = _form.getvalue('token')
-        elif SESSION_SCRIPT_MANAGE and sessionid:
+        elif SESSION_SCRIPT_MANAGE and sessionid and token:
             pass
         else:
             html_redirect(LOGIN_PAGE)
@@ -170,10 +171,11 @@ def start_new_session(message=None):
 
     # We have now authenticated, or this is an anonymous session.
     # Execute the session script. This should display URL to stdout.
+    arguments = [SESSION_SCRIPT]
     if sessionid:
-        arguments = [SESSION_SCRIPT,sessionid,token]
-    else:
-        arguments = [SESSION_SCRIPT,token]
+        arguments.append(sessionid)
+    if token:
+        arguments.append(token)
 
     try:
         p = subprocess.Popen(arguments,
@@ -205,6 +207,10 @@ def start_new_session(message=None):
     if sessionid:
         cookie['sessionid'] = sessionid
 
+    # Store token
+    if token:
+        cookie['token'] = token
+
     # Store session type
     if _authenticated:
         cookie['auth'] = 'yes'
@@ -223,13 +229,14 @@ def start_new_session(message=None):
 
 # --- Session Launcher ---
 def session_launcher():
-    global _form, _authenticated, _expiration, _sessionid
+    global _form, _authenticated, _expiration, _sessionid, _token
 
     # set here to help with unit tests
     _form = None
     _authenticated = False
     _expiration = None
     _sessionid = None
+    _token = None
 
     # Start the header
     print "Content-Type: text/html"
@@ -261,6 +268,9 @@ def session_launcher():
 
         if 'sessionid' in cookie:
             _sessionid = cookie['sessionid'].value
+
+        if 'token' in cookie:
+            _token = cookie['token'].value
 
         # --- cookie retrieved, we have been here before ---
         if new_session_requested(_form):
