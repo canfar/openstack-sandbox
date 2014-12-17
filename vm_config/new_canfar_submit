@@ -20,15 +20,12 @@ Submit a CANFAR processing job.
   [image]         VM image for job (name or ID)
   [flavor]        hardware flavor (name or ID)
 
-Note:
-
-Prior to running this script the following OpenStack environment variables
-must be set (e.g., by sourcing your openrc file):
+Note: Prior to running this script the following OpenStack environment
+variables must be set (e.g., by sourcing your openrc file):
   OS_AUTH_URL
   OS_USERNAME
   OS_PASSWORD
-  OS_TENANT_NAME     (this must be the tenant that owns the image)
-       
+  OS_TENANT_NAME     (this must be the tenant that owns the image)      
 "
     exit
 }
@@ -46,8 +43,8 @@ FLAVOR=$3
 # and flavor names to their IDs, which is what canfar_job_validate expects.
 # --jobscriptonvm will be ignored since it is only used in the disabled
 # POST to the web service
-IMAGEID_AND_FLAVORID=`./cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --jobscriptonvm=/bin/foo --nopost` || die "failed to share image and determine image/flavor IDs"
+IMAGEID_AND_FLAVORID=`cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --jobscriptonvm=/bin/foo --nopost` || die "failed to share image and determine image/flavor IDs"
 
-JOB=`./new_canfar_job_validate ${JOBFILE} ${IMAGEID_AND_FLAVORID}` || die "failed to validate jobfile: ${JOB}"
+JOB=`new_canfar_job_validate ${JOBFILE} ${IMAGEID_AND_FLAVORID}` || die "failed to validate jobfile: ${JOB}"
 
 echo "${JOB}" | condor_submit || die "failed to submit job to queue"

@@ -28,8 +28,8 @@ logging.disable(logging.CRITICAL)
 # Parameters that we generate (e.g., from command-line parameters)
 # and don't want user to define, along with a message explaining why.
 param_disallow = dict(
-    [ ['Requirements', 'Generated from image_uri'],
-      ['+VMAMI', 'Generated from image_uri'],
+    [ ['Requirements', 'Generated from image'],
+      ['+VMAMI', 'Generated from image'],
       ['+VMInstanceType', 'Generated from flavor'] ] )
 
 # OpenStack auth configuration / defaults.
@@ -210,7 +210,7 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
         match = re.findall(regex,jobfile_data,re.MULTILINE)
 
         if match:
-            msg = "jobfile should not contain parameter '%s':\n%s" \
+            msg = "jobfile should not contain parameter '%s'. Reason: \n%s" \
                   % (param, param_disallow[param])
             raise Exception(msg)
 
