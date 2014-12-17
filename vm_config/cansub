@@ -205,7 +205,6 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
             msg = msg + ', '.join(flavor_names)
             raise Exception(msg)
 
-
     # Now POST the job to the service. Note that we strip the '-canfar'
     # suffix from the OpenStack username to get the CANFAR username.
     # Also, see this stackoverflow post about how to send mulipart form
@@ -239,10 +238,12 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
         canfar_user = auth['username'].split('-canfar')[0]
         r = requests.post(_PROC_URL, params=params, files=files,
                           auth=HTTPBasicAuth(canfar_user, auth['password']))
-        if args.verbose:
-            print "Response to POST: %s" % str(r)
+        try:
+            r.raise_for_status()
+        except Exception as E:
+            # Make sure we print contents of response if Exception raised
             print r.text
-        r.raise_for_status()
+            raise E
 
 except Exception as E:
     print "ERROR:",E
