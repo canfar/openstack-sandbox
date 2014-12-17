@@ -37,7 +37,8 @@ import logging
 logging.disable(logging.CRITICAL)
 
 # URL of the proc service
-_PROC_URL = 'http://www.canfar.phys.uvic.ca/proc/auth/job'
+#_PROC_URL = 'http://www.canfar.phys.uvic.ca/proc/auth/job'
+_PROC_URL = 'http://www3.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/proc/auth/job'
 
 # ID of the batch tenant we need to share with                                 
 _BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
@@ -206,28 +207,41 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
 
 
     # Now POST the job to the service. Note that we strip the '-canfar'
-    # suffix from the OpenStack username to get the CANFAR username
+    # suffix from the OpenStack username to get the CANFAR username.
+    # Also, see this stackoverflow post about how to send mulipart form
+    # data in the POST with requests:
+    # http://stackoverflow.com/questions/12385179/how-to-send-a-multipart-form-data-with-requests-in-python
     if jobscript:
         execdata = 'param:%s' % jobscript_data
     else:
         execdata = 'vm:%s' % jobscriptonvm
-    payload = { 'job'   : jobfile_data,
-                'exec'  : execdata,
-                'image' : 'vmi:%s' % image_id,
-                'flavor': 'fli:%s' % flavor_id }
+
+    params = { 'image' : 'vmi:%s' % image_id,
+               'flavor': 'fli:%s' % flavor_id,
+               'job'   : 'job,param:job',
+               'exec'  : 'exec,param:exec' }
+
+    files = { 'job'   : jobfile_data,
+              'exec'  : execdata }
+
     if args.nopost:
         if args.verbose:
             print "VM shared and flavor checks out, but --nopost requested."
-            "The following payload will NOT be POSTed to the service:"
-            for key in payload:
-                print "\n+++%s+++\n%s" % (key,payload[key])
+            "The following will NOT be POSTed to the service:"
+            for d in [params, files]:
+                print "------------------------"
+                for key in d:
+                    print "+++%s+++\n%s" % (key,d[key])
         else:
             # Useful outputs that can be fed to canfar_job_validate
             print "%s %s" % (image_id,flavor_id)
     else:
         canfar_user = auth['username'].split('-canfar')[0]
-        r = requests.post(_PROC_URL, params=payload,
+        r = requests.post(_PROC_URL, params=params, files=files,
                           auth=HTTPBasicAuth(canfar_user, auth['password']))
+        if args.verbose:
+            print "Response to POST: %s" % str(r)
+            print r.text
         r.raise_for_status()
 
 except Exception as E:
@@ -238,7 +252,7 @@ except Exception as E:
 valid openrc file to set OS_* environment variables ?)'''
     sys.exit(1)
 
-
-
+if args.verbose:
+    print "Success!"
 
 sys.exit(0)
