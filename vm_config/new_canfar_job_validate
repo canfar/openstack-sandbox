@@ -228,7 +228,7 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
     g = glclient.Client(glance_endpoint, token=k.auth_token)
     i = g.images.get(image_id)
     image_name = i['name']
-    tenant_id = i['owner_id']    # 'owner' seems to be the same value
+    tenant_id = i['owner']
 
     k_image = ksclient.Client(username=auth['username'],
                               password=auth['password'],
