@@ -1,0 +1,210 @@
+#!/usr/bin/env python
+#
+# A client for the CANFAR proc (batch) web service.
+#
+# Inputs:
+#   - Condor job description file
+#   - job script that performs data reduction on the VM
+#   - username, password for authorization
+#   - VM image (name or UUID) and tenant (name or UUID)
+#   - OpenStack flavor (name or UUID)
+#
+# The client will authenticate to OpenStack in order to:
+#   - share the user VM with the batch processing tenant
+#   - translate image, tenant, and flavor names to UUID as needed
+#
+# The client will also authenticate to CANFAR in order to submit
+# the job:
+#   - http://www.canfar.phys.uvic.ca/proc/
+
+import argparse
+import collections
+import errno
+import keystoneclient.v2_0.client as ksclient
+from keystoneclient.apiclient import exceptions as keystone_exceptions
+import novaclient.v1_1.client as nclient
+import glanceclient.v2.client as glclient
+from glanceclient.exc import HTTPConflict
+import json
+import os
+import re
+import requests
+import sys
+import uuid
+import logging
+#logging.basicConfig()
+logging.disable(logging.CRITICAL)
+
+# ID of the batch tenant we need to share with                                 
+_BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
+
+# OpenStack auth configuration / defaults.
+# Take OS_* variables if provided (with following defaults).
+# command-line overrides OS_*
+if 'OS_AUTH_URL' not in os.environ:
+    os.environ['OS_AUTH_URL'] = 'https://west.cloud.computecanada.ca:5000/v2.0'
+if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
+    os.environ['OS_USERNAME'] = os.environ['USER']+'-canfar'
+
+auth = {'username':'',
+        'password':'',
+        'tenant_name' : '',
+        'auth_url':''}
+
+image_uuid = None
+flavor_uuid = None
+
+# --- ENTRYPOINT --------------------------------------------------------------
+
+try:
+    # Parse command line
+    description = "Submit a job to the CANFAR proc (batch) service."
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('jobfile',help='Condor job description file')
+    parser.add_argument('image',help='VM image for job (name or UUID)')
+    parser.add_argument('flavor',help='hardware flavor (name or UUID)')
+    parser.add_argument('--jobscript',
+                        help='Transfer this local job execution script to VM')
+    parser.add_argument('--jobscriptonvm',
+                        help='Execution script that already exists on VM')
+    parser.add_argument('--os-username',help='user name if OS_USERNAME not set')
+    parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
+    parser.add_argument('--os-tenant-name',
+                        help='tenant name for image if OS_TENANT_NAME not set')
+    parser.add_argument('--os-auth-url',help='auth URL if OS_AUTH_URL not set')
+    parser.add_argument('-v','--verbose',default=False,
+                        help='verbose output',action='store_true')
+
+    args = parser.parse_args()
+
+    # Obtain auth parameters from command-line / environment
+    for key in auth:
+        argname = 'os_'+key
+        osvar = argname.upper()
+        if eval( 'args.'+argname ):
+            auth[key] = eval( 'args.'+argname )
+        elif osvar in os.environ:
+            auth[key] = os.environ[osvar]
+        else:
+            raise Exception("Neither --%s nor %s set in the environment" \
+                % (argname.replace('_','-'), osvar))
+
+    jobfile = args.jobfile
+    if args.jobscript:
+        if args.jobscriptonvm:
+            raise Exception("Both --jobscript and --jobscriptonvm supplied")
+        jobscript = args.jobscript
+        jobscriptonvm = None
+    elif args.jobscriptonvm:
+        jobscriptonvm = args.jobscriptonvm
+        jobscript = None
+    else:
+        raise Exception("Must specify either --jobscript or --jobscriptonvm")
+    image = args.image
+    flavor = args.flavor
+
+    if args.verbose:
+        print \
+'''auth_url: %s
+username: %s
+password: HIDDEN
+tenant_name: %s
+jobfile: %s
+jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
+                    jobfile, jobscript)
+
+    # Read in jobfile and jobscript
+    try:
+        jobfile_data = open(jobfile,'r').read()
+    except:
+        raise Exception("Could not read the contents of jobfile '%s'" \
+                        % jobfile)
+
+    if jobscript:
+        jobscript_data = open(jobscript,'r').read()
+
+    # Keystone, glance, and nova clients scoped to the given tenant
+    k = ksclient.Client(username=auth['username'],
+                        password=auth['password'],
+                        tenant_name=auth['tenant_name'],
+                        auth_url=auth['auth_url'])
+    glance_endpoint = k.service_catalog.url_for(service_type='image')
+    g = glclient.Client(glance_endpoint, token=k.auth_token)
+    n = nclient.Client(auth['username'], auth['password'],
+                       auth['tenant_name'], auth['auth_url'])
+
+    # We will require an image UUID. If the user supplied a name, convert
+    # it to UUID.
+    try:
+        # user provided image_uuid 
+        image_uuid = str(uuid.UUID(image))
+        image_name = None
+    except:
+        # user provided image_name
+        image_uuid = None
+        image_name = image
+
+    if not image_uuid:
+        matches = []
+        for i in g.images.list():
+            if image_name == i['name']:
+                matches.append(i['id'])
+
+        if len(matches) == 0:
+            raise Exception("Couldn't find image named '%s'" % image_name)
+        elif len(matches) > 1:
+            errstr="Multiple image UUIDs in tenant '%s' match image name '%s':\n%s"\
+                % (auth['tenant_name'], image_name, '\n'.join(matches))
+            raise Exception(errstr)
+        else:
+            # unique image_uuid
+            image_uuid = matches[0]
+
+    # Share the image with batch tenant.
+    try:
+        if args.verbose:
+            print "sharing image_uuid '%s' with batch tenant" % image_uuid
+        g.image_members.create(image_uuid,_BATCH_TENANT_ID)
+    except HTTPConflict as E:
+        if E.code == 409:
+            if args.verbose:
+                print "Image already shared."
+            pass
+        else:
+            raise E
+
+    # We will require a flavor UUID. If the user supplied a name, convert
+    # it to UUID.
+    try:
+        # user provided flavor_uuid
+        flavor_uuid = str(uuid.UUID(flavor))
+        flavor_name = None
+    except:
+        # user provided image_name
+        flavor_uuid = None
+        flavor_name = flavor
+
+    if not flavor_uuid:
+        flavors = n.flavors.list()
+        for f in flavors:
+            if flavor_name == f.name:
+                flavor_uuid = f.id
+        if not flavor_uuid:
+            flavor_names = [f.name for f in flavors]
+            msg = "Supplied flavor '%s' is not valid. Must be one of:\n"\
+                  % flavor
+            msg = msg + ', '.join(flavor_names)
+            raise Exception(msg)
+
+except Exception as E:
+    print "ERROR:",E
+    if isinstance(E, keystone_exceptions.Unauthorized):
+        print \
+'''Are your name, password, and tenant set correctly? (e.g., did you source a
+valid openrc file to set OS_* environment variables ?)'''
+    sys.exit(1)
+
+print "SUCCESS: image_uuid='%s' flavor_uuid='%s'" % (image_uuid,flavor_uuid)
+
+sys.exit(0)
