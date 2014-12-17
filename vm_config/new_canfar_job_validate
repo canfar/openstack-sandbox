@@ -210,7 +210,7 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
         match = re.findall(regex,jobfile_data,re.MULTILINE)
 
         if match:
-            msg = "jobfile should not contain parameter '%s'. Reason: \n%s" \
+            msg = "jobfile should not contain parameter '%s'. Reason: %s" \
                   % (param, param_disallow[param])
             raise Exception(msg)
 
