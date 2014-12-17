@@ -29,6 +29,7 @@ import json
 import os
 import re
 import requests
+from requests.auth import HTTPBasicAuth
 import sys
 import uuid
 import logging
@@ -215,11 +216,14 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
                 'image' : 'vmi:%s' % image_id,
                 'flavor': 'fli:%s' % flavor_id }
     if args.nopost:
-        print "VM shared and flavor checks out, but --nopost requested."
         if args.verbose:
+            print "VM shared and flavor checks out, but --nopost requested."
             "The following payload will NOT be POSTed to the service:"
             for key in payload:
                 print "\n+++%s+++\n%s" % (key,payload[key])
+        else:
+            # Useful outputs that can be fed to canfar_job_validate
+            print "%s %s" % (image_id,flavor_id)
     else:
         canfar_user = auth['username'].split('-canfar')[0]
         r = requests.post(_PROC_URL, params=payload,
