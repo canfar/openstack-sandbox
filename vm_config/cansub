@@ -6,7 +6,7 @@
 #   - Condor job description file
 #   - job script that performs data reduction on the VM
 #   - username, password for authorization
-#   - VM image (name or UUID) and tenant (name or UUID)
+#   - VM image (name or UUID) and tenant (name)
 #   - OpenStack flavor (name or UUID)
 #
 # The client will authenticate to OpenStack in order to:
@@ -34,6 +34,9 @@ import uuid
 import logging
 #logging.basicConfig()
 logging.disable(logging.CRITICAL)
+
+# URL of the proc service
+_PROC_URL = 'http://www.canfar.phys.uvic.ca/proc/auth/job'
 
 # ID of the batch tenant we need to share with                                 
 _BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
@@ -68,7 +71,10 @@ try:
                         help='Transfer this local job execution script to VM')
     parser.add_argument('--jobscriptonvm',
                         help='Execution script that already exists on VM')
-    parser.add_argument('--os-username',help='user name if OS_USERNAME not set')
+    parser.add_argument('--nopost',default=False,action='store_true',
+                        help='Share VM but do not actually POST to service')
+    parser.add_argument('--os-username',
+                        help='user name if OS_USERNAME not set')
     parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
     parser.add_argument('--os-tenant-name',
                         help='tenant name for image if OS_TENANT_NAME not set')
@@ -197,6 +203,29 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
             msg = msg + ', '.join(flavor_names)
             raise Exception(msg)
 
+
+    # Now POST the job to the service. Note that we strip the '-canfar'
+    # suffix from the OpenStack username to get the CANFAR username
+    if jobscript:
+        execdata = 'param:%s' % jobscript_data
+    else:
+        execdata = 'vm:%s' % jobscriptonvm
+    payload = { 'job'   : jobfile_data,
+                'exec'  : execdata,
+                'image' : 'vmi:%s' % image_uuid,
+                'flavor': 'fli:%s' % flavor_uuid }
+    if args.nopost:
+        print "VM shared and job checks out, but --nopost requested."
+        if args.verbose:
+            "The following payload will NOT be POSTed to the service:"
+            for key in payload:
+                print "\n+++%s+++\n%s" % (key,payload[key])
+    else:
+        canfar_user = auth['username'].split('-canfar')[0]
+        r = requests.post(_PROC_URL, params=payload,
+                          auth=HTTPBasicAuth(canfar_user, auth['password']))
+        r.raise_for_status()
+
 except Exception as E:
     print "ERROR:",E
     if isinstance(E, keystone_exceptions.Unauthorized):
@@ -205,6 +234,7 @@ except Exception as E:
 valid openrc file to set OS_* environment variables ?)'''
     sys.exit(1)
 
-print "SUCCESS: image_uuid='%s' flavor_uuid='%s'" % (image_uuid,flavor_uuid)
+
+
 
 sys.exit(0)
