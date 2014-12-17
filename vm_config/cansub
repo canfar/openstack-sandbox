@@ -54,8 +54,8 @@ auth = {'username':'',
         'tenant_name' : '',
         'auth_url':''}
 
-image_uuid = None
-flavor_uuid = None
+image_id = None
+flavor_id = None
 
 # --- ENTRYPOINT --------------------------------------------------------------
 
@@ -65,8 +65,8 @@ try:
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('jobfile',help='Condor job description file')
-    parser.add_argument('image',help='VM image for job (name or UUID)')
-    parser.add_argument('flavor',help='hardware flavor (name or UUID)')
+    parser.add_argument('image',help='VM image for job (name or ID)')
+    parser.add_argument('flavor',help='hardware flavor (name or ID)')
     parser.add_argument('--jobscript',
                         help='Transfer this local job execution script to VM')
     parser.add_argument('--jobscriptonvm',
@@ -140,18 +140,18 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
     n = nclient.Client(auth['username'], auth['password'],
                        auth['tenant_name'], auth['auth_url'])
 
-    # We will require an image UUID. If the user supplied a name, convert
-    # it to UUID.
+    # We will require an image ID. If the user supplied a name, convert
+    # it to ID.
     try:
-        # user provided image_uuid 
-        image_uuid = str(uuid.UUID(image))
+        # user provided image_id 
+        image_id = str(uuid.UUID(image))
         image_name = None
     except:
         # user provided image_name
-        image_uuid = None
+        image_id = None
         image_name = image
 
-    if not image_uuid:
+    if not image_id:
         matches = []
         for i in g.images.list():
             if image_name == i['name']:
@@ -160,18 +160,18 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
         if len(matches) == 0:
             raise Exception("Couldn't find image named '%s'" % image_name)
         elif len(matches) > 1:
-            errstr="Multiple image UUIDs in tenant '%s' match image name '%s':\n%s"\
+            errstr="Multiple image IDs in tenant '%s' match image name '%s':\n%s"\
                 % (auth['tenant_name'], image_name, '\n'.join(matches))
             raise Exception(errstr)
         else:
-            # unique image_uuid
-            image_uuid = matches[0]
+            # unique image_id
+            image_id = matches[0]
 
     # Share the image with batch tenant.
     try:
         if args.verbose:
-            print "sharing image_uuid '%s' with batch tenant" % image_uuid
-        g.image_members.create(image_uuid,_BATCH_TENANT_ID)
+            print "sharing image_id '%s' with batch tenant" % image_id
+        g.image_members.create(image_id,_BATCH_TENANT_ID)
     except HTTPConflict as E:
         if E.code == 409:
             if args.verbose:
@@ -180,23 +180,23 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
         else:
             raise E
 
-    # We will require a flavor UUID. If the user supplied a name, convert
-    # it to UUID.
+    # We will require a flavor ID. If the user supplied a name, convert
+    # it to ID.
     try:
-        # user provided flavor_uuid
-        flavor_uuid = str(uuid.UUID(flavor))
+        # user provided flavor_id
+        flavor_id = str(uuid.UUID(flavor))
         flavor_name = None
     except:
         # user provided image_name
-        flavor_uuid = None
+        flavor_id = None
         flavor_name = flavor
 
-    if not flavor_uuid:
+    if not flavor_id:
         flavors = n.flavors.list()
         for f in flavors:
             if flavor_name == f.name:
-                flavor_uuid = f.id
-        if not flavor_uuid:
+                flavor_id = f.id
+        if not flavor_id:
             flavor_names = [f.name for f in flavors]
             msg = "Supplied flavor '%s' is not valid. Must be one of:\n"\
                   % flavor
@@ -212,10 +212,10 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
         execdata = 'vm:%s' % jobscriptonvm
     payload = { 'job'   : jobfile_data,
                 'exec'  : execdata,
-                'image' : 'vmi:%s' % image_uuid,
-                'flavor': 'fli:%s' % flavor_uuid }
+                'image' : 'vmi:%s' % image_id,
+                'flavor': 'fli:%s' % flavor_id }
     if args.nopost:
-        print "VM shared and job checks out, but --nopost requested."
+        print "VM shared and flavor checks out, but --nopost requested."
         if args.verbose:
             "The following payload will NOT be POSTed to the service:"
             for key in payload:
