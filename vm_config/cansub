@@ -37,8 +37,8 @@ import logging
 logging.disable(logging.CRITICAL)
 
 # URL of the proc service
-#_PROC_URL = 'http://www.canfar.phys.uvic.ca/proc/auth/job'
-_PROC_URL = 'http://www3.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/proc/auth/job'
+_PROC_URL = 'http://www.canfar.phys.uvic.ca/proc/auth/job'
+#_PROC_URL = 'http://www3.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/proc/auth/job'
 
 # ID of the batch tenant we need to share with                                 
 _BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
