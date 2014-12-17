@@ -18,16 +18,12 @@
 #   - http://www.canfar.phys.uvic.ca/proc/
 
 import argparse
-import collections
-import errno
 import keystoneclient.v2_0.client as ksclient
 from keystoneclient.apiclient import exceptions as keystone_exceptions
 import novaclient.v1_1.client as nclient
 import glanceclient.v2.client as glclient
 from glanceclient.exc import HTTPConflict
-import json
 import os
-import re
 import requests
 from requests.auth import HTTPBasicAuth
 import sys
