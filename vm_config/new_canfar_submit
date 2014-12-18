@@ -46,9 +46,7 @@ JOBSCRIPT=`echo ${JOBFILE} | sed -r 's/^[^#]*Executable\s+=\s+(.*)$/\1/'` || die
 
 # Call cansub with --nopost simply to share the image and translate image
 # and flavor names to their IDs, which is what canfar_job_validate expects.
-# --jobscriptonvm will be ignored since it is only used in the disabled
-# POST to the web service
-IMAGEID_AND_FLAVORID=`cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --jobscriptonvm=/bin/foo --nopost` || die "failed to share image and determine image/flavor IDs"
+IMAGEID_AND_FLAVORID=`cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --nopost` || die "failed to share image and determine image/flavor IDs"
 
 JOB=`new_canfar_job_validate ${JOBFILE} ${JOBSCRIPT} ${IMAGEID_AND_FLAVORID}` || die "failed to validate jobfile: ${JOB}"
 
