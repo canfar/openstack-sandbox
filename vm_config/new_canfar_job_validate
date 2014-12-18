@@ -128,9 +128,10 @@ runcmd:
 try:
     # Parse command line
     description = \
-    '''Create a validated CANFAR submission file (written to stdout) based on
-    a Condor job description file and other user inputs.
-    '''
+    '''Create a validated CANFAR submission file (written to stdout), and a
+    customized cloud-config YAML file (in %s), based on a Condor job
+    description file, image, and flavor.
+    ''' % confdir
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('jobfile',help='Condor job description file')
