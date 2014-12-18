@@ -222,7 +222,7 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
     params = { 'image' : 'vmi:%s' % image_id,
                'flavor': 'fli:%s' % flavor_id,
                'job'   : 'job,param:job',
-               'exec'  : 'exec,param:exec' }
+               'exec'  : '%s,param:exec' % jobscript }
 
     files = { 'job'   : jobfile_data,
               'exec'  : execdata }
