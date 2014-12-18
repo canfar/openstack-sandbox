@@ -52,20 +52,12 @@ confscript = sharepath+'/canfar_batch_setup.bash'
 
 # Location for per-user cloud config YAML files. The actual file name
 # is a uuid to avoid clashes (since these are user- and job-specific)
-try:
-    submitter = os.environ['USER']
-except:
-    print "Error obtaining user name from $USER"
-    sys.exit(1)
 confdir = '/var/cache/canfar'
-conf_yml = '%s/%s_%s.yml' % (confdir,submitter,uuid.uuid4())
-
 
 # Subroutine to generate a cloud config file. This is copied almost verbatim
 # from make_cloud_config, and should be moved to a module at a later point.
-def make_cloud_config(inputscript,pubkey,output_yml,
-                      image_name=None,
-                      submitter=None):
+def make_cloud_config(inputscript,pubkey,output_yml,submitter,
+                      image_name=None):
     # Generate a cloud config file (YAML) that performs the following
     # operations:
     # - mount an ephemeral partition
@@ -150,10 +142,12 @@ try:
     parser.add_argument('--os-tenant-name',
                         help='tenant name if OS_TENANT_NAME not set')
     parser.add_argument('--os-auth-url',help='auth URL if OS_AUTH_URL not set')
+    parser.add_argument('--submitter',
+                        help='Set submitter for YAML (default $USER)')
     parser.add_argument('-v','--verbose',default=False,
                         help='verbose output',action='store_true')
 
-    args,extra_args = parser.parse_known_args()
+    args = parser.parse_args()
 
     # Obtain auth parameters from command-line / environment
     for key in auth:
@@ -166,6 +160,16 @@ try:
         else:
             raise Exception("Neither --%s nor %s set in the environment" \
                 % (argname.replace('_','-'), osvar))
+
+    if args.submitter:
+        submitter = args.submitter
+    else:
+        try:
+            submitter = os.environ['USER']
+        except:
+            print "Error obtaining user name from $USER"
+            sys.exit(1)
+    conf_yml = '%s/%s_%s.yml' % (confdir,submitter,uuid.uuid4())
 
     jobfile = args.jobfile
     # check for valid UUIDs
@@ -257,9 +261,8 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
 
     vmtype = '%s:%s'%(image_tenant_name,image_name)
 
-    make_cloud_config(confscript,canfarcspubkey,conf_yml,
-                      image_name=vmtype,
-                      submitter=submitter)
+    make_cloud_config(confscript,canfarcspubkey,conf_yml,submitter,
+                      image_name=vmtype)
 
 except Exception as E:
     print "ERROR:",E
