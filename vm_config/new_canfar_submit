@@ -40,7 +40,8 @@ FLAVOR=$3
 [[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
 
 # Extract JOBSCRIPT from JOBFILE
-JOBSCRIPT=`echo ${JOBFILE} | sed -r 's/^[^#]*Executable\s+=\s+(.*)$/\1/'` || die "could not search for 'Executable' in ${JOBFILE}"
+JOBSCRIPT="`grep '^[^#]*Executable\s*=' test.sub | cut -d= -f2`" || die "could not search for 'Executable' in ${JOBFILE}"
+JOBSCRIPT=`echo ${JOBSCRIPT}` # remove whitespace
 [[ -z ${JOBSCRIPT} ]] && die "could not extract 'Executable' from ${JOBFILE}"
 [[ -e ${JOBSCRIPT} ]] || die "Executable '${JOBSCRIPT}' from ${JOBFILE} does not exist"
 
