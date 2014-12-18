@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 #
-# A user provides a bare condor submission file, as well as image and flavor
-# IDs.
+# A user provides a bare condor job description file, as well as image
+# and flavor IDs.
 #
-# This script validates these inputs and writes a validated script
-# including extra cloud scheduler parameters to stdout, and also
+# This script validates these inputs and writes an augmented condor
+# job file including extra cloud scheduler parameters to stdout, and also
 # generates a cloud-config script that cloud scheduler will use to
 # configure running instances of the VM to work with Condor.
 #
@@ -130,11 +130,12 @@ try:
     description = \
     '''Create a validated CANFAR submission file (written to stdout), and a
     customized cloud-config YAML file (in %s), based on a Condor job
-    description file, image, and flavor.
+    description file, job execution script, image, and flavor.
     ''' % confdir
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('jobfile',help='Condor job description file')
+    parser.add_argument('jobscript',help='Condor job execution script')
     parser.add_argument('image_id',help='VM image ID for job')
     parser.add_argument('flavor_id',help='hardware flavor ID')
     parser.add_argument('--os-username',
@@ -173,6 +174,8 @@ try:
     conf_yml = '%s/%s_%s.yml' % (confdir,submitter,uuid.uuid4())
 
     jobfile = args.jobfile
+    jobscript = args.jobscript
+
     # check for valid UUIDs
     try:
         image_id = str(uuid.UUID(args.image_id))
@@ -200,7 +203,7 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
                     jobfile, image_id, flavor_id)
 
 
-    # Check for required parameters in jobfile
+    # Check parameters in jobfile
     try:
         jobfile_data = open(jobfile,'r').read()
     except:
@@ -218,6 +221,15 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
             msg = "jobfile should not contain parameter '%s'. Reason: %s" \
                   % (param, param_disallow[param])
             raise Exception(msg)
+
+    # Re-write 'Executable' line since the proc web service will have
+    # placed it somewhere different from the user's original location
+    if not os.path.isfile(jobscript):
+        raise Exception("jobscript '%s' does not exist" % jobscript)
+
+    jobfile_data =  re.sub('^\s*Executable\s*=\s*(.*)$',
+                           'Executable = %s' % jobscript,
+                           jobfile_data,flags=re.MULTILINE)
 
     # determine the name of the image from its UUID, and the name
     # of the tenant that owns it. First we get a glance client to

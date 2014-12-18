@@ -24,6 +24,7 @@ import novaclient.v1_1.client as nclient
 import glanceclient.v2.client as glclient
 from glanceclient.exc import HTTPConflict
 import os
+import re
 import requests
 from requests.auth import HTTPBasicAuth
 import sys
@@ -65,8 +66,6 @@ try:
     parser.add_argument('jobfile',help='Condor job description file')
     parser.add_argument('image',help='VM image for job (name or ID)')
     parser.add_argument('flavor',help='hardware flavor (name or ID)')
-    parser.add_argument('--jobscript',
-                        help='Transfer this local job execution script to VM')
     parser.add_argument('--jobscriptonvm',
                         help='Execution script that already exists on VM')
     parser.add_argument('--nopost',default=False,action='store_true',
@@ -95,19 +94,37 @@ try:
                 % (argname.replace('_','-'), osvar))
 
     jobfile = args.jobfile
-    if args.jobscript:
-        if args.jobscriptonvm:
-            raise Exception("Both --jobscript and --jobscriptonvm supplied")
-        jobscript = args.jobscript
-        jobscriptonvm = None
-    elif args.jobscriptonvm:
-        jobscriptonvm = args.jobscriptonvm
-        jobscript = None
-    else:
-        raise Exception("Must specify either --jobscript or --jobscriptonvm")
+    jobscriptonvm = args.jobscriptonvm
     image = args.image
     flavor = args.flavor
 
+    # Read in jobfile and jobscript
+    try:
+        jobfile_data = open(jobfile,'r').read()
+    except:
+        raise Exception("Could not read the contents of jobfile '%s'" \
+                        % jobfile)
+
+    # Search for the name of the job execution script in the Condor
+    # job description file
+    jobscript = None
+    matches = re.findall("^\s*Executable\s*=\s*(.*)$",jobfile_data,
+                         re.MULTILINE)
+
+    if matches:
+        if len(matches) > 1:
+            raise Exception("Multiple 'Executable' values in jobfile:\n%s" % \
+                            '\n'.join(matches))
+        elif jobscriptonvm:
+            raise Exception(
+                "Both 'Executable' in jobfile and '--jobscriptonvm' specified")
+        else:
+            jobscript = matches[0]
+            jobscript_data = open(jobscript,'r').read()
+    elif not jobscriptonvm:
+        raise Exception(
+            "Must specify 'Executable' in jobfile or '--jobscriptonvm'")
+    
     if args.verbose:
         print \
 '''auth_url: %s
@@ -118,15 +135,6 @@ jobfile: %s
 jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
                     jobfile, jobscript)
 
-    # Read in jobfile and jobscript
-    try:
-        jobfile_data = open(jobfile,'r').read()
-    except:
-        raise Exception("Could not read the contents of jobfile '%s'" \
-                        % jobfile)
-
-    if jobscript:
-        jobscript_data = open(jobscript,'r').read()
 
     # Keystone, glance, and nova clients scoped to the given tenant
     k = ksclient.Client(username=auth['username'],
@@ -238,7 +246,8 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
             r.raise_for_status()
         except Exception as E:
             # Make sure we print contents of response if Exception raised
-            print r.text
+            print "*** proc web service reported the following error:\n" +\
+                str(r.text)
             raise E
 
 except Exception as E:
