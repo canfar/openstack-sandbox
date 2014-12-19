@@ -187,11 +187,6 @@ try:
         raise Exception("flavor_id '%s' is not a valid UUID" % args.flavor_id)
 
     if args.verbose:
-        print "auth_url: %s\nusername: %s\npassword: HIDDEN\ntenant_name: %s\njobfile: %s" % \
-            (auth['auth_url'],auth['username'],auth['tenant_name'] or 'NOT SET',
-             jobfile)
-
-    if args.verbose:
         print \
 '''auth_url: %s
 username: %s
@@ -290,6 +285,9 @@ jobfile = '''Requirements = VMType =?= "%s" && Arch == "x86_64"
 +VMAMIConfig    = "%s"
 +VMKeepAlive    = 5
 ''' % (vmtype,image_id,flavor_id,conf_yml) + jobfile_data
+
+if args.verbose:
+    print "---BEGIN JOBFILE---------------------------------------------------------------"
 
 print jobfile
 
