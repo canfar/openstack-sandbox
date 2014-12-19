@@ -4,7 +4,6 @@
 #
 # Inputs:
 #   - Condor job description file
-#   - job script that performs data reduction on the VM
 #   - username, password for authorization
 #   - VM image (name or UUID) and tenant (name)
 #   - OpenStack flavor (name or UUID)
@@ -116,8 +115,8 @@ try:
             raise Exception("Multiple 'Executable' values in jobfile:\n%s" % \
                             '\n'.join(matches))
         elif jobscriptonvm:
-            raise Exception(
-                "Both 'Executable' in jobfile and '--jobscriptonvm' specified")
+            # Allow jobscriptonvm to override Executable line in jobfile
+            jobscript = None
         else:
             jobscript = matches[0]
             jobscript_data = open(jobscript,'r').read()
@@ -214,18 +213,21 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
     # Also, see this stackoverflow post about how to send mulipart form
     # data in the POST with requests:
     # http://stackoverflow.com/questions/12385179/how-to-send-a-multipart-form-data-with-requests-in-python
-    if jobscript:
-        execdata = 'param:%s' % jobscript_data
-    else:
-        execdata = 'vm:%s' % jobscriptonvm
 
     params = { 'image' : 'vmi:%s' % image_id,
                'flavor': 'fli:%s' % flavor_id,
-               'job'   : 'job,param:job',
-               'exec'  : '%s,param:exec' % jobscript }
+               'job'   : 'job,param:job' }
 
-    files = { 'job'   : jobfile_data,
-              'exec'  : execdata }
+    files = { 'job' : jobfile_data }
+
+    if jobscriptonvm:
+        params['exec'] = '%s,vm:%s' \
+                         % (os.path.basename(jobscriptonvm),jobscriptonvm)
+    else:
+        params['exec'] = '%s,param:exec' \
+                         % os.path.basename(jobscript)
+        files['exec'] = jobscript_data
+
 
     if args.nopost:
         if args.verbose:
