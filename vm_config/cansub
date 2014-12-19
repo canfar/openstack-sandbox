@@ -1,0 +1,266 @@
+#!/usr/bin/env python
+#
+# A client for the CANFAR proc (batch) web service.
+#
+# Inputs:
+#   - Condor job description file
+#   - username, password for authorization
+#   - VM image (name or UUID) and tenant (name)
+#   - OpenStack flavor (name or UUID)
+#
+# The client will authenticate to OpenStack in order to:
+#   - share the user VM with the batch processing tenant
+#   - translate image, tenant, and flavor names to UUID as needed
+#
+# The client will also authenticate to CANFAR in order to submit
+# the job:
+#   - http://www.canfar.phys.uvic.ca/proc/
+
+import argparse
+import keystoneclient.v2_0.client as ksclient
+from keystoneclient.apiclient import exceptions as keystone_exceptions
+import novaclient.v1_1.client as nclient
+import glanceclient.v2.client as glclient
+from glanceclient.exc import HTTPConflict
+import os
+import re
+import requests
+from requests.auth import HTTPBasicAuth
+import sys
+import uuid
+import logging
+#logging.basicConfig()
+logging.disable(logging.CRITICAL)
+
+# URL of the proc service
+_PROC_URL = 'http://www.canfar.phys.uvic.ca/proc/auth/job'
+#_PROC_URL = 'http://www3.cadc-ccda.hia-iha.nrc-cnrc.gc.ca/proc/auth/job'
+
+# ID of the batch tenant we need to share with                                 
+_BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
+
+# OpenStack auth configuration / defaults.
+# Take OS_* variables if provided (with following defaults).
+# command-line overrides OS_*
+if 'OS_AUTH_URL' not in os.environ:
+    os.environ['OS_AUTH_URL'] = 'https://west.cloud.computecanada.ca:5000/v2.0'
+if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
+    os.environ['OS_USERNAME'] = os.environ['USER']+'-canfar'
+
+auth = {'username':'',
+        'password':'',
+        'tenant_name' : '',
+        'auth_url':''}
+
+image_id = None
+flavor_id = None
+
+# --- ENTRYPOINT --------------------------------------------------------------
+
+try:
+    # Parse command line
+    description = "Submit a job to the CANFAR proc (batch) service."
+    parser = argparse.ArgumentParser(description=description)
+
+    parser.add_argument('jobfile',help='Condor job description file')
+    parser.add_argument('image',help='VM image for job (name or ID)')
+    parser.add_argument('flavor',help='hardware flavor (name or ID)')
+    parser.add_argument('--jobscriptonvm',
+                        help='Execution script that already exists on VM')
+    parser.add_argument('--nopost',default=False,action='store_true',
+                        help='Share VM but do not actually POST to service')
+    parser.add_argument('--os-username',
+                        help='user name if OS_USERNAME not set')
+    parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
+    parser.add_argument('--os-tenant-name',
+                        help='tenant name for image if OS_TENANT_NAME not set')
+    parser.add_argument('--os-auth-url',help='auth URL if OS_AUTH_URL not set')
+    parser.add_argument('-v','--verbose',default=False,
+                        help='verbose output',action='store_true')
+
+    args = parser.parse_args()
+
+    # Obtain auth parameters from command-line / environment
+    for key in auth:
+        argname = 'os_'+key
+        osvar = argname.upper()
+        if eval( 'args.'+argname ):
+            auth[key] = eval( 'args.'+argname )
+        elif osvar in os.environ:
+            auth[key] = os.environ[osvar]
+        else:
+            raise Exception("Neither --%s nor %s set in the environment" \
+                % (argname.replace('_','-'), osvar))
+
+    jobfile = args.jobfile
+    jobscriptonvm = args.jobscriptonvm
+    image = args.image
+    flavor = args.flavor
+
+    # Read in jobfile and jobscript
+    try:
+        jobfile_data = open(jobfile,'r').read()
+    except:
+        raise Exception("Could not read the contents of jobfile '%s'" \
+                        % jobfile)
+
+    # Search for the name of the job execution script in the Condor
+    # job description file
+    jobscript = None
+    matches = re.findall("^\s*Executable\s*=\s*(.*)$",jobfile_data,
+                         re.MULTILINE)
+
+    if matches:
+        if len(matches) > 1:
+            raise Exception("Multiple 'Executable' values in jobfile:\n%s" % \
+                            '\n'.join(matches))
+        elif jobscriptonvm:
+            # Allow jobscriptonvm to override Executable line in jobfile
+            jobscript = None
+        else:
+            jobscript = matches[0]
+            jobscript_data = open(jobscript,'r').read()
+    elif not jobscriptonvm:
+        raise Exception(
+            "Must specify 'Executable' in jobfile or '--jobscriptonvm'")
+    
+    if args.verbose:
+        print \
+'''auth_url: %s
+username: %s
+password: HIDDEN
+tenant_name: %s
+jobfile: %s
+jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
+                    jobfile, jobscript)
+
+
+    # Keystone, glance, and nova clients scoped to the given tenant
+    k = ksclient.Client(username=auth['username'],
+                        password=auth['password'],
+                        tenant_name=auth['tenant_name'],
+                        auth_url=auth['auth_url'])
+    glance_endpoint = k.service_catalog.url_for(service_type='image')
+    g = glclient.Client(glance_endpoint, token=k.auth_token)
+    n = nclient.Client(auth['username'], auth['password'],
+                       auth['tenant_name'], auth['auth_url'])
+
+    # We will require an image ID. If the user supplied a name, convert
+    # it to ID.
+    try:
+        # user provided image_id 
+        image_id = str(uuid.UUID(image))
+        image_name = None
+    except:
+        # user provided image_name
+        image_id = None
+        image_name = image
+
+    if not image_id:
+        matches = []
+        for i in g.images.list():
+            if image_name == i['name']:
+                matches.append(i['id'])
+
+        if len(matches) == 0:
+            raise Exception("Couldn't find image named '%s'" % image_name)
+        elif len(matches) > 1:
+            errstr="Multiple image IDs in tenant '%s' match image name '%s':\n%s"\
+                % (auth['tenant_name'], image_name, '\n'.join(matches))
+            raise Exception(errstr)
+        else:
+            # unique image_id
+            image_id = matches[0]
+
+    # Share the image with batch tenant.
+    try:
+        if args.verbose:
+            print "sharing image_id '%s' with batch tenant" % image_id
+        g.image_members.create(image_id,_BATCH_TENANT_ID)
+    except HTTPConflict as E:
+        if E.code == 409:
+            if args.verbose:
+                print "Image already shared."
+            pass
+        else:
+            raise E
+
+    # We will require a flavor ID. If the user supplied a name, convert
+    # it to ID.
+    try:
+        # user provided flavor_id
+        flavor_id = str(uuid.UUID(flavor))
+        flavor_name = None
+    except:
+        # user provided image_name
+        flavor_id = None
+        flavor_name = flavor
+
+    if not flavor_id:
+        flavors = n.flavors.list()
+        for f in flavors:
+            if flavor_name == f.name:
+                flavor_id = f.id
+        if not flavor_id:
+            flavor_names = [f.name for f in flavors]
+            msg = "Supplied flavor '%s' is not valid. Must be one of:\n"\
+                  % flavor
+            msg = msg + ', '.join(flavor_names)
+            raise Exception(msg)
+
+    # Now POST the job to the service. Note that we strip the '-canfar'
+    # suffix from the OpenStack username to get the CANFAR username.
+    # Also, see this stackoverflow post about how to send mulipart form
+    # data in the POST with requests:
+    # http://stackoverflow.com/questions/12385179/how-to-send-a-multipart-form-data-with-requests-in-python
+
+    params = { 'image' : 'vmi:%s' % image_id,
+               'flavor': 'fli:%s' % flavor_id,
+               'job'   : 'job,param:job' }
+
+    files = { 'job' : jobfile_data }
+
+    if jobscriptonvm:
+        params['exec'] = '%s,vm:%s' \
+                         % (os.path.basename(jobscriptonvm),jobscriptonvm)
+    else:
+        params['exec'] = '%s,param:exec' \
+                         % os.path.basename(jobscript)
+        files['exec'] = jobscript_data
+
+
+    if args.nopost:
+        if args.verbose:
+            print "VM shared and flavor checks out, but --nopost requested."
+            "The following will NOT be POSTed to the service:"
+            for d in [params, files]:
+                print "------------------------"
+                for key in d:
+                    print "+++%s+++\n%s" % (key,d[key])
+        else:
+            # Useful outputs that can be fed to canfar_job_validate
+            print "%s %s" % (image_id,flavor_id)
+    else:
+        canfar_user = auth['username'].split('-canfar')[0]
+        r = requests.post(_PROC_URL, params=params, files=files,
+                          auth=HTTPBasicAuth(canfar_user, auth['password']))
+        try:
+            r.raise_for_status()
+        except Exception as E:
+            # Make sure we print contents of response if Exception raised
+            print "*** proc web service reported the following error:\n" +\
+                str(r.text)
+            raise E
+
+except Exception as E:
+    print "ERROR:",E
+    if isinstance(E, keystone_exceptions.Unauthorized):
+        print \
+'''Are your name, password, and tenant set correctly? (e.g., did you source a
+valid openrc file to set OS_* environment variables ?)'''
+    sys.exit(1)
+
+if args.verbose:
+    print "Success!"
+
+sys.exit(0)
