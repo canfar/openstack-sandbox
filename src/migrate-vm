@@ -504,10 +504,14 @@ except:
 
 # -----------------------------------------------------------------------------
 # Fix up network settings
+# A combination of the following web pages:
+# - http://docs.openstack.org/image-guide/content/centos-image.html
+# - http://www.andrewklau.com/device-eth0-does-not-seem-to-be-present-delaying-initialization/
 # -----------------------------------------------------------------------------
 
 try:
     if os_type in ['sl5','sl6']:
+        # NOZEROCONF
         fname = '/etc/sysconfig/network'
         print "+++ Adding NOZEROCONF=yes to %s..." % fname
         network = g.read_lines(fname)
@@ -516,11 +520,19 @@ try:
             # Copy over lines that don't contain NOZEROCONF (in case =no)
             if not re.search('NOZEROCONF',line.upper()):
                 network_new.append(line)
-
-        # Add in the new line and write to disk
         network_new.append('NOZEROCONF=yes')
         g.write(fname,"\n".join(network_new))
 
+        # Remove details about interface, and block persistent interface
+        # file from being created
+        print "+++ Removing persistent network interface information..."
+        fname = '/etc/sysconfig/network-scripts/ifcfg-eth0'
+        cfg = g.read_file(fname)
+        for k in ['HWADDR','HOSTNAME','UUID']:
+            cfg = re.sub('%s.*?\n' % k,'', cfg)
+        g.write(fname,cfg)
+        g.rm_f('/etc/udev/rules.d/*-persistent-*')
+        g.touch('/etc/udev/rules.d/75-persistent-net-generator.rules')
 except:
     traceback.print_exc(file=sys.stdout)
     print "--- ERROR: Didn't work"
