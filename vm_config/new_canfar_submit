@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # User script for submitting jobs. A wrapper for cansub,
-# canfar_job_validate and condor_submit. Normally a user should just
+# canfar_job_validate and condor_submit. Normally a user should
 # use cansub (without the --nopost option) so that the job goes
 # through the web service. This script avoids the web service and can
 # submit jobs directly on the head node for testing purposes.
