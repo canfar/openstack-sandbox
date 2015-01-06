@@ -246,9 +246,11 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
                           auth=HTTPBasicAuth(canfar_user, auth['password']))
         try:
             r.raise_for_status()
+            print "*** jobs successfully submitted to cluster '%s'" % \
+                str(r.text)
         except Exception as E:
             # Make sure we print contents of response if Exception raised
-            print "*** proc web service reported the following error:\n" +\
+            print "*** proc web service reports the following error:\n" +\
                 str(r.text)
             raise E
 
@@ -259,8 +261,5 @@ except Exception as E:
 '''Are your name, password, and tenant set correctly? (e.g., did you source a
 valid openrc file to set OS_* environment variables ?)'''
     sys.exit(1)
-
-if args.verbose:
-    print "Success!"
 
 sys.exit(0)

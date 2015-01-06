@@ -4,9 +4,10 @@
 # and flavor IDs.
 #
 # This script validates these inputs and writes an augmented condor
-# job file including extra cloud scheduler parameters to stdout, and also
-# generates a cloud-config script that cloud scheduler will use to
-# configure running instances of the VM to work with Condor.
+# job file including extra cloud scheduler parameters to stdout (or a
+# specified output file), and also generates a cloud-config script
+# that cloud scheduler will use to configure running instances of the
+# VM to work with Condor.
 #
 # Bad exit status is set upon failure.
 
@@ -128,9 +129,10 @@ runcmd:
 try:
     # Parse command line
     description = \
-    '''Create a validated CANFAR submission file (written to stdout), and a
-    customized cloud-config YAML file (in %s), based on a Condor job
-    description file, job execution script, image, and flavor.
+    '''Create a validated CANFAR submission file (written to stdout, unless
+    '--outfile' specified), and a customized cloud-config YAML file (in %s),
+    based on a Condor job description file, job execution script, image, and
+    flavor.
     ''' % confdir
     parser = argparse.ArgumentParser(description=description)
 
@@ -138,6 +140,8 @@ try:
     parser.add_argument('jobscript',help='Condor job execution script')
     parser.add_argument('image_id',help='VM image ID for job')
     parser.add_argument('flavor_id',help='hardware flavor ID')
+    parser.add_argument('--outfile',
+                        help='write new jobfile instead of printing to stdout')
     parser.add_argument('--os-username',
                         help='user name if OS_USERNAME not set')
     parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
@@ -200,10 +204,14 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
 
     # Check parameters in jobfile
     try:
+        if args.verbose:
+            print "Loading jobfile."
         jobfile_data = open(jobfile,'r').read()
     except:
         raise Exception("Could not read the contents of "+jobfile)
 
+    if args.verbose:
+        print "Searching for illegal keywords."
     for param in param_disallow:
         par_regex = param
         if param[0] == '+':
@@ -219,6 +227,8 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
 
     # Re-write 'Executable' line since the proc web service will have
     # placed it somewhere different from the user's original location
+    if args.verbose:
+        print "Updating Executable to '%s'." % jobscript
     if not os.path.isfile(jobscript):
         raise Exception("jobscript '%s' does not exist" % jobscript)
 
@@ -232,6 +242,8 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
     # metadata to obtain its owner tenant id. Finally, we use a second
     # keystone client scoped to the image's owner tenant to obtain
     # its tenant name
+    if args.verbose:
+        print "Determine image and tenant names."
     k = ksclient.Client(username=auth['username'],
                         password=auth['password'],
                         tenant_name=auth['tenant_name'],
@@ -286,9 +298,17 @@ jobfile = '''Requirements = VMType =?= "%s" && Arch == "x86_64"
 +VMKeepAlive    = 5
 ''' % (vmtype,image_id,flavor_id,conf_yml) + jobfile_data
 
-if args.verbose:
-    print "---BEGIN JOBFILE---------------------------------------------------------------"
-
-print jobfile
+if args.outfile:
+    try:
+        open(args.outfile,'w').write(jobfile)
+        print "Modified jobfile written to --outfile '%s'" % args.outfile
+    except Exception as E:
+        print "ERROR: Failed to write --outfile '%s'" % args.outfile
+        print E
+        sys.exit(1)
+else:
+    if args.verbose:
+        print "---BEGIN JOBFILE---------------------------------------------------------------"
+    print jobfile
 
 sys.exit(0)
