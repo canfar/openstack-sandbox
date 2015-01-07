@@ -31,11 +31,14 @@ try:
                         help='Input VM image file')
     parser.add_argument('--outputvmtype', required=True,
                         help='Converted output VM image name (no suffix)')
+    parser.add_argument('--extraspace', default=None,
+                        help='Add this amount of extra space (bytes)')
     args = parser.parse_args()
     inputimage=args.inputimage
     outputvmtype=args.outputvmtype
     outputimage=outputvmtype+'.img'
     outputimage_final=outputvmtype+'.qcow2'
+    extraspace=args.extraspace
 
     # Get the location of the script so that we can find the templates
     script_path = os.path.dirname(os.path.realpath(__file__))
@@ -86,6 +89,8 @@ try:
     # Note that we tack on 4096 sectors * 512 bytes/sector to leave
     # some extra space for the partitioning in the 'part_add' call below
     size = os.path.getsize(inputimage) + 512 * 4096
+    if extraspace:
+        size = size + int(extraspace)
     f = open(outputimage,'ab')
     f.truncate(size)
     f.close()
@@ -183,6 +188,16 @@ try:
     print "+++ Copying data to the partition..."
     g.copy_device_to_device(root, '/dev/sdb1', sparse=True)
 
+    if extraspace:
+        print "+++ Running e2fsck prior to resize..."
+        try:
+            g.e2fsck('/dev/sdb1',forceall=True)
+        except Exception as E:
+            print "+++ it complained, but ignoring: %s" % str(E)
+        print "+++ Resizing partition to fill space..."
+        g.resize2fs('/dev/sdb1')
+
+
     # If the input image had the label it will be propagated, but we
     # explicitly set it again here just in case
     print "+++ Label partition as '/'..."
@@ -241,20 +256,29 @@ try:
         # used by KVM (and get its boot parameters from
         # syslinux.cfg). When booting under xen, PyGrub will still
         # pick up the old settings in /boot/grub/menu.lst.
-        print "+++ For Scientific Linux 5 we need to install a generic kernel"
+        print "+++ Scientific Linux 5: remove xen kernel, install generic one"
+
+        # Remove the Xen kernels since some images don't have enough space
+        # for both. This also removed fuse, so we re-install with the
+        # generic kernel later
+        subprocess.check_call("chroot %s yum -y remove kernel-xen" \
+                              % (guestos), shell=True)
 
         # Install the kernel using chroot, and obtain the version number
         # from the yum log so that we can run mkinitrd
-        subprocess.check_call("chroot %s yum -y install kernel" % (guestos), \
-                              shell=True)
+        subprocess.check_call("chroot %s yum -y install kernel fuse" \
+                              % (guestos), shell=True)
 
         f = open("%s/var/log/yum.log" % (guestos), "r")
         lines = f.readlines()
         f.close()
-        m = re.search('kernel-([\d.-]+.el5).*',lines[-1])
-        if m:
-            kernel_version = m.group(1)
-        else:
+        kernel_version = None
+        for line in reversed(lines):
+            m = re.search('kernel-([\d.-]+.el5).*',line)
+            if m:
+                kernel_version = m.group(1)
+                break
+        if not kernel_version:
             raise Exception("Couldn't get installed kernel from yum.log")
         initrd_name = "initrd-%s.img" % (kernel_version)
         os.rename("%s/boot/%s" % (guestos,initrd_name), \
@@ -432,22 +456,22 @@ except:
     sys.exit(1)
 
 # Update grub/menu.lst for Xen
-try:
-    print "+++ Updating /boot/grub/menu.lst for Xen..."
-    menu = g.read_file('/boot/grub/menu.lst')
+#try:
+#    print "+++ Updating /boot/grub/menu.lst for Xen..."
+#    menu = g.read_file('/boot/grub/menu.lst')
 
     # needed for SL6
-    menu = menu.replace('/dev/xvde', '/dev/xvde1')
+#    menu = menu.replace('/dev/xvde', '/dev/xvde1')
 
     # needed for Ubuntu
-    menu = menu.replace('/dev/xvda', '/dev/xvda1')
+#    menu = menu.replace('/dev/xvda', '/dev/xvda1')
 
-    g.write('/boot/grub/menu.lst',menu)
+#    g.write('/boot/grub/menu.lst',menu)
 
-except:
-    traceback.print_exc(file=sys.stdout)
-    print "--- ERROR: Didn't work"
-    sys.exit(1)
+#except:
+#    traceback.print_exc(file=sys.stdout)
+#    print "--- WARNING: failed, but ignoring. We don't care about Xen now."
+
 
 
 
