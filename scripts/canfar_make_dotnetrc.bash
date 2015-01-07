@@ -113,7 +113,6 @@ canfar_make_dotnetrc() {
     msg "User ${user} .netrc is ready for CANFAR"
 }
 
-
 # Store all options
 OPTS=$(getopt \
     -o hv \
