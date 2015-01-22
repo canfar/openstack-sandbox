@@ -1,5 +1,5 @@
 #------------------------------------------------------------------------------
-# Settings for cadcSessionLauncher
+# Settings for canfarSessionLauncher
 #
 # For a list of CGI environment variables see:
 #   http://www.cgi101.com/book/ch3/text.html
@@ -24,7 +24,7 @@ EXPIRATION_DAYS = 1
 #   - scope is a full VOSpace URI for which a scoped token is being requested.
 _base_url = 'www.canfar.phys.uvic.ca'
 _delegation_url = _base_url+'/canfar/loginDelegation.html'
-_scope =  urllib.quote_plus('vos://cadc.nrc.ca~vospace/echapin')
+_scope =  urllib.quote_plus('vos://www.canfar.phys.uvic.ca~vospace/echapin')
 
 _request = 'http://'+os.environ["HTTP_HOST"]+os.environ["REQUEST_URI"]
 _url = urlparse.urlparse(_request)._replace(query='')

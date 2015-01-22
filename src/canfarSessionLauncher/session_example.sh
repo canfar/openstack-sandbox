@@ -1,5 +1,5 @@
 #!/bin/sh
-# Example of a session script that is called by cadcSessionLauncher.py
+# Example of a session script that is called by canfarSessionLauncher.py
 
 SESSIONID=$1
 TOKEN=$2
