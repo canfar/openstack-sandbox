@@ -23,13 +23,13 @@ http_cookie_auth2 = 'auth=yes; sessionlink="http://another.url.com?token=yes"'
 http_cookie_junk = 'useless=value'
 
 # import after basic CGI variables defined
-import cadcSessionLauncher
+import canfarSessionLauncher
 
 # success/fail session launcher scripts
 script_success = 'test/session_test_success.sh'
 script_test_manage = 'test/session_test_manage.sh'
 script_fail = 'test/session_test_fail.sh'
-cadcSessionLauncher.SESSION_SCRIPT=script_success
+canfarSessionLauncher.SESSION_SCRIPT=script_success
 
 # Since we're testing a CGI script we need to capture and parse the
 # HTML pages that it is writing to stdout. Use this context manager
@@ -59,7 +59,7 @@ class Capturing(list):
 def parse_session_launcher():
     # Get the output and parse the header
     with Capturing() as output:
-        cadcSessionLauncher.session_launcher()
+        canfarSessionLauncher.session_launcher()
 
     # Turn output into a file-like object and feed to HTTPMessage
     # constructor to pick off the header from the body
@@ -97,7 +97,7 @@ class TestSessionLauncher(unittest.TestCase):
     def test_anon(self):
 
         # First tests don't let the session script manage sessions
-        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
+        canfarSessionLauncher.SESSION_SCRIPT_MANAGE=False
 
         # first time in no cookie, create session and redirect
         h = parse_session_launcher()
@@ -126,8 +126,8 @@ class TestSessionLauncher(unittest.TestCase):
         # generated on the first call and get the same link. Final
         # time we request a new session, so we should get a new
         # sessionid
-        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=True
-        cadcSessionLauncher.SESSION_SCRIPT=script_test_manage
+        canfarSessionLauncher.SESSION_SCRIPT_MANAGE=True
+        canfarSessionLauncher.SESSION_SCRIPT=script_test_manage
         os.environ['QUERY_STRING'] = 'new=yes'
         h = parse_session_launcher()
         sessionid = h['cookies']['sessionid']
@@ -151,36 +151,36 @@ class TestSessionLauncher(unittest.TestCase):
 
         del os.environ['QUERY_STRING']
         del os.environ['HTTP_COOKIE']
-        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
-        cadcSessionLauncher.SESSION_SCRIPT=script_success
+        canfarSessionLauncher.SESSION_SCRIPT_MANAGE=False
+        canfarSessionLauncher.SESSION_SCRIPT=script_success
 
 
     # Session script failures
     def test_session_script(self):
         # Incorrect filename in settings, can't execute
-        cadcSessionLauncher.SESSION_SCRIPT='junk_filename_87163487163487'
+        canfarSessionLauncher.SESSION_SCRIPT='junk_filename_87163487163487'
         h = parse_session_launcher()
         self.assertEqual(h['status'],'500')
 
         # Executes script but returns bad status
-        cadcSessionLauncher.SESSION_SCRIPT=script_fail
+        canfarSessionLauncher.SESSION_SCRIPT=script_fail
         h = parse_session_launcher()
         self.assertEqual(h['status'],'502')
 
-        cadcSessionLauncher.SESSION_SCRIPT=script_success
+        canfarSessionLauncher.SESSION_SCRIPT=script_success
 
     # An authenticated user
     @patch('urllib2.build_opener')
     def test_auth(self,mock_build_opener):
 
         # First tests don't let the session script manage sessions
-        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
+        canfarSessionLauncher.SESSION_SCRIPT_MANAGE=False
 
         # first time in no cookie, redirect to login page
         os.environ['QUERY_STRING'] = 'auth=yes'
         h = parse_session_launcher()
         self.assertEqual(h['status'],'303')
-        self.assertEqual(h['location'],cadcSessionLauncher.LOGIN_PAGE)
+        self.assertEqual(h['location'],canfarSessionLauncher.LOGIN_PAGE)
         del os.environ['QUERY_STRING']
 
         # back from login page with token, create session/redirect
@@ -213,7 +213,7 @@ class TestSessionLauncher(unittest.TestCase):
         os.environ['HTTP_COOKIE'] = http_cookie_junk
         h = parse_session_launcher()
         self.assertEqual(h['status'],'303')
-        self.assertEqual(h['location'],cadcSessionLauncher.LOGIN_PAGE)
+        self.assertEqual(h['location'],canfarSessionLauncher.LOGIN_PAGE)
         del os.environ['QUERY_STRING']
         del os.environ['HTTP_COOKIE']
 
@@ -233,13 +233,13 @@ class TestSessionLauncher(unittest.TestCase):
         # generated on the first call and get the same link.  Final
         # time we request a new session, so we should get a new
         # sessionid despite cookie.
-        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=True
-        cadcSessionLauncher.SESSION_SCRIPT=script_test_manage
+        canfarSessionLauncher.SESSION_SCRIPT_MANAGE=True
+        canfarSessionLauncher.SESSION_SCRIPT=script_test_manage
 
         os.environ['QUERY_STRING'] = 'new=yes&auth=yes'
         h = parse_session_launcher()
         self.assertEqual(h['status'],'303')
-        self.assertEqual(h['location'],cadcSessionLauncher.LOGIN_PAGE)
+        self.assertEqual(h['location'],canfarSessionLauncher.LOGIN_PAGE)
         del os.environ['QUERY_STRING']
 
         os.environ['QUERY_STRING'] = 'auth=yes&token=abc123'
@@ -267,8 +267,8 @@ class TestSessionLauncher(unittest.TestCase):
 
         del os.environ['QUERY_STRING']
         del os.environ['HTTP_COOKIE']
-        cadcSessionLauncher.SESSION_SCRIPT_MANAGE=False
-        cadcSessionLauncher.SESSION_SCRIPT=script_success
+        canfarSessionLauncher.SESSION_SCRIPT_MANAGE=False
+        canfarSessionLauncher.SESSION_SCRIPT=script_success
 
 def run():
     suite = unittest.TestLoader().loadTestsFromTestCase(TestSessionLauncher)

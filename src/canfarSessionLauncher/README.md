@@ -1,6 +1,6 @@
-# CADC Session Launcher
+# CANFAR Session Launcher
 
-**cadcSessionLauncher** is a CGI script, implemented in Python, that provides a mechanism for starting and redirecting the user to arbitrary web application sessions. These applications are initiated by a user-supplied launcher script. CADC authorization with access to a portion of a user's VOSpace is possible using scoped tokens.
+**canfarSessionLauncher** is a CGI script, implemented in Python, that provides a mechanism for starting and redirecting the user to arbitrary web application sessions. These applications are initiated by a user-supplied launcher script. CANFAR authorization with access to a portion of a user's VOSpace is possible using scoped tokens.
 
 To start an authenticated session provide ```auth=yes``` as a query parameter, otherwise an anonymous session is created.
 
