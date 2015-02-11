@@ -31,24 +31,23 @@ variables must be set (e.g., by sourcing your openrc file):
 }
 
 
-[ "$#" -eq 3 ] || usage
+[[ $# -eq 3 ]] || usage
 
 JOBFILE=$1
 IMAGE=$2
 FLAVOR=$3
 
-[[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
+[[ -e ${JOBFILE} ]] || die "job file '${JOBFILE}' does not exist"
 
 # Extract JOBSCRIPT from JOBFILE
-JOBSCRIPT="`grep '^[^#]*Executable\s*=' test.sub | cut -d= -f2`" || die "could not search for 'Executable' in ${JOBFILE}"
-JOBSCRIPT=`echo ${JOBSCRIPT}` # remove whitespace
+JOBSCRIPT="$(grep '^[^#]*Executable\s*=' ${JOBFILE} | cut -d= -f2 | awk '{print $1}')" || die "could not search for 'Executable' in ${JOBFILE}"
 [[ -z ${JOBSCRIPT} ]] && die "could not extract 'Executable' from ${JOBFILE}"
 [[ -e ${JOBSCRIPT} ]] || die "Executable '${JOBSCRIPT}' from ${JOBFILE} does not exist"
 
 # Call cansub with --nopost simply to share the image and translate image
 # and flavor names to their IDs, which is what canfar_job_validate expects.
-IMAGEID_AND_FLAVORID=`cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --nopost` || die "failed to share image and determine image/flavor IDs"
+IMAGEID_AND_FLAVORID=$(cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --nopost) || die "failed to share image and determine image/flavor IDs"
 
-JOB=`new_canfar_job_validate ${JOBFILE} ${JOBSCRIPT} ${IMAGEID_AND_FLAVORID}` || die "failed to validate jobfile: ${JOB}"
+JOB=$(canfar_job_validate ${JOBFILE} ${JOBSCRIPT} ${IMAGEID_AND_FLAVORID}) || die "failed to validate jobfile: ${JOB}"
 
 echo "${JOB}" | condor_submit || die "failed to submit job to queue"
