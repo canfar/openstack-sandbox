@@ -117,6 +117,9 @@ canfar_condor_configure() {
 	SOFT_UID_DOMAIN = TRUE
 	STARTER_ALLOW_RUNAS_OWNER = TRUE
 	UPDATE_COLLECTOR_WITH_TCP = TRUE
+	NUM_SLOTS = 1
+	NUM_SLOTS_TYPE_1 = 1
+	SLOTS_TYPE_1_PARTITIONABLE = TRUE
 	######################################################
 	EOF
     echo "${CM_HOST_NAME}" > /etc/condor/central_manager
