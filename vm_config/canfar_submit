@@ -1,7 +1,10 @@
 #!/bin/bash
 #
-# User script for submitting jobs. A wrapper for canfar_job_validate and
-# condor_submit.
+# User script for submitting jobs. A wrapper for cansub,
+# canfar_job_validate and condor_submit. Normally a user should
+# use cansub (without the --nopost option) so that the job goes
+# through the web service. This script avoids the web service and can
+# submit jobs directly on the head node for testing purposes.
 
 EXEC_NAME=$(basename $0 .${0##*.})
 
@@ -11,11 +14,18 @@ die() {
 }
 
 usage() {
-    echo $"Usage: ${EXEC_NAME} [jobfile] [image_uri] [flavor]
-Submit a CANFAR processing job
-  [jobfile]           Condor job description submission file
-  [image_uri]         VM image for job. Valid forms: 'image_uuid' or 'tenant_name:image_name'
-  [flavor]            a valid hardware flavor
+    echo $"Usage: ${EXEC_NAME} [jobfile] [image] [flavor]
+Submit a CANFAR processing job.
+  [jobfile]       Condor job description file
+  [image]         VM image for job (name or ID)
+  [flavor]        hardware flavor (name or ID)
+
+Note: Prior to running this script the following OpenStack environment
+variables must be set (e.g., by sourcing your openrc file):
+  OS_AUTH_URL
+  OS_USERNAME
+  OS_PASSWORD
+  OS_TENANT_NAME     (this must be the tenant that owns the image)      
 "
     exit
 }
@@ -24,11 +34,21 @@ Submit a CANFAR processing job
 [ "$#" -eq 3 ] || usage
 
 JOBFILE=$1
-IMAGE_URI=$2
+IMAGE=$2
 FLAVOR=$3
 
 [[ -e ${JOBFILE} ]] || die "jobfile '${JOBFILE}' does not exist"
 
-JOB=`canfar_job_validate ${JOBFILE} ${IMAGE_URI} ${FLAVOR}` || die "failed to validate jobfile: ${JOB}"
+# Extract JOBSCRIPT from JOBFILE
+JOBSCRIPT="`grep '^[^#]*Executable\s*=' test.sub | cut -d= -f2`" || die "could not search for 'Executable' in ${JOBFILE}"
+JOBSCRIPT=`echo ${JOBSCRIPT}` # remove whitespace
+[[ -z ${JOBSCRIPT} ]] && die "could not extract 'Executable' from ${JOBFILE}"
+[[ -e ${JOBSCRIPT} ]] || die "Executable '${JOBSCRIPT}' from ${JOBFILE} does not exist"
+
+# Call cansub with --nopost simply to share the image and translate image
+# and flavor names to their IDs, which is what canfar_job_validate expects.
+IMAGEID_AND_FLAVORID=`cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --nopost` || die "failed to share image and determine image/flavor IDs"
+
+JOB=`new_canfar_job_validate ${JOBFILE} ${JOBSCRIPT} ${IMAGEID_AND_FLAVORID}` || die "failed to validate jobfile: ${JOB}"
 
 echo "${JOB}" | condor_submit || die "failed to submit job to queue"

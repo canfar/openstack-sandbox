@@ -1,26 +1,22 @@
 #!/usr/bin/env python
 #
-# A user provides a bare condor submission file, as well as some additional
-# cloud scheduler / OpenStack parameters:
-# image_uri:    uuid
-#                or
-#               tenant_name:image_name
-# flavor:       hardware profile for the cloud
+# A user provides a bare condor job description file, as well as image
+# and flavor IDs.
 #
-# This script validates these inputs and writes a validated script
-# including extra cloud scheduler parameters to stdout.
+# This script validates these inputs and writes an augmented condor
+# job file including extra cloud scheduler parameters to stdout (or a
+# specified output file), and also generates a cloud-config script
+# that cloud scheduler will use to configure running instances of the
+# VM to work with Condor.
 #
 # Bad exit status is set upon failure.
 
 import argparse
-import collections
 import errno
 import keystoneclient.v2_0.client as ksclient
 from keystoneclient.apiclient import exceptions as keystone_exceptions
-import novaclient.v1_1.client as nclient
 import glanceclient.v2.client as glclient
 from glanceclient.exc import HTTPConflict
-import json
 import os
 import re
 import requests
@@ -30,14 +26,11 @@ import logging
 #logging.basicConfig()
 logging.disable(logging.CRITICAL)
 
-# ID of the batch tenant we need to share with                                 
-_BATCH_TENANT_ID = '4267ed6832cd4a1f8d7057142fb36520'
-
 # Parameters that we generate (e.g., from command-line parameters)
 # and don't want user to define, along with a message explaining why.
 param_disallow = dict(
-    [ ['Requirements', 'Generated from image_uri'],
-      ['+VMAMI', 'Generated from image_uri'],
+    [ ['Requirements', 'Generated from image'],
+      ['+VMAMI', 'Generated from image'],
       ['+VMInstanceType', 'Generated from flavor'] ] )
 
 # OpenStack auth configuration / defaults.
@@ -60,20 +53,12 @@ confscript = sharepath+'/canfar_batch_setup.bash'
 
 # Location for per-user cloud config YAML files. The actual file name
 # is a uuid to avoid clashes (since these are user- and job-specific)
-try:
-    submitter = os.environ['USER']
-except:
-    print "Error obtaining user name from $USER"
-    sys.exit(1)
 confdir = '/var/cache/canfar'
-conf_yml = '%s/%s_%s.yml' % (confdir,submitter,uuid.uuid4())
-
 
 # Subroutine to generate a cloud config file. This is copied almost verbatim
 # from make_cloud_config, and should be moved to a module at a later point.
-def make_cloud_config(inputscript,pubkey,output_yml,
-                      image_name=None,
-                      submitter=None):
+def make_cloud_config(inputscript,pubkey,output_yml,submitter,
+                      image_name=None):
     # Generate a cloud config file (YAML) that performs the following
     # operations:
     # - mount an ephemeral partition
@@ -144,24 +129,31 @@ runcmd:
 try:
     # Parse command line
     description = \
-    '''Create a validated CANFAR submission file (written to stdout) based on
-    a Condor job description file and other user inputs.
-    '''
+    '''Create a validated CANFAR submission file (written to stdout, unless
+    '--outfile' specified), and a customized cloud-config YAML file (in %s),
+    based on a Condor job description file, job execution script, image, and
+    flavor.
+    ''' % confdir
     parser = argparse.ArgumentParser(description=description)
 
     parser.add_argument('jobfile',help='Condor job description file')
-    parser.add_argument('image_uri',help="VM image for job. Valid forms: 'image_uuid' or 'tenant_name:image_name' (this image tenant_name need not match --tenant_name)")
-    parser.add_argument('flavor',help='a valid hardware flavor')
-    parser.add_argument('--os-username',help='user name if OS_USERNAME not set')
+    parser.add_argument('jobscript',help='Condor job execution script')
+    parser.add_argument('image_id',help='VM image ID for job')
+    parser.add_argument('flavor_id',help='hardware flavor ID')
+    parser.add_argument('--outfile',
+                        help='write new jobfile instead of printing to stdout')
+    parser.add_argument('--os-username',
+                        help='user name if OS_USERNAME not set')
     parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
     parser.add_argument('--os-tenant-name',
-                        help='tenant name if OS_TENANT_NAME not set (for authentication only; not required)')
+                        help='tenant name if OS_TENANT_NAME not set')
     parser.add_argument('--os-auth-url',help='auth URL if OS_AUTH_URL not set')
-
+    parser.add_argument('--submitter',
+                        help='Set submitter for YAML (default $USER)')
     parser.add_argument('-v','--verbose',default=False,
                         help='verbose output',action='store_true')
 
-    args,extra_args = parser.parse_known_args()
+    args = parser.parse_args()
 
     # Obtain auth parameters from command-line / environment
     for key in auth:
@@ -171,28 +163,55 @@ try:
             auth[key] = eval( 'args.'+argname )
         elif osvar in os.environ:
             auth[key] = os.environ[osvar]
-        elif key == 'tenant_name':
-            # If not set by user we will discover a tenant ourselves
-            pass
         else:
             raise Exception("Neither --%s nor %s set in the environment" \
                 % (argname.replace('_','-'), osvar))
 
+    if args.submitter:
+        submitter = args.submitter
+    else:
+        try:
+            submitter = os.environ['USER']
+        except:
+            print "Error obtaining user name from $USER"
+            sys.exit(1)
+    conf_yml = '%s/%s_%s.yml' % (confdir,submitter,uuid.uuid4())
+
     jobfile = args.jobfile
-    image_uri = args.image_uri
-    flavor = args.flavor
+    jobscript = args.jobscript
+
+    # check for valid UUIDs
+    try:
+        image_id = str(uuid.UUID(args.image_id))
+    except:
+        raise Exception("image_id '%s' is not a valid UUID" % args.image_id)
+    try:
+        flavor_id = str(uuid.UUID(args.flavor_id))
+    except:
+        raise Exception("flavor_id '%s' is not a valid UUID" % args.flavor_id)
 
     if args.verbose:
-        print "auth_url: %s\nusername: %s\npassword: HIDDEN\ntenant_name: %s\njobfile: %s" % \
-            (auth['auth_url'],auth['username'],auth['tenant_name'] or 'NOT SET',
-             jobfile)
+        print \
+'''auth_url: %s
+username: %s
+password: HIDDEN
+tenant_name: %s
+jobfile: %s
+image_id: %s
+flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
+                    jobfile, image_id, flavor_id)
 
-    # Check for required parameters in jobfile
+
+    # Check parameters in jobfile
     try:
+        if args.verbose:
+            print "Loading jobfile."
         jobfile_data = open(jobfile,'r').read()
     except:
         raise Exception("Could not read the contents of "+jobfile)
 
+    if args.verbose:
+        print "Searching for illegal keywords."
     for param in param_disallow:
         par_regex = param
         if param[0] == '+':
@@ -202,151 +221,44 @@ try:
         match = re.findall(regex,jobfile_data,re.MULTILINE)
 
         if match:
-            msg = "jobfile should not contain parameter '%s':\n%s" \
+            msg = "jobfile should not contain parameter '%s'. Reason: %s" \
                   % (param, param_disallow[param])
             raise Exception(msg)
 
-    # This keystone client is a convenient way to get a
-    # non-tenant-scoped token.
-    k_nt = ksclient.Client(username=auth['username'],
-                           password=auth['password'],
-                           auth_url=auth['auth_url'])
+    # Re-write 'Executable' line since the proc web service will have
+    # placed it somewhere different from the user's original location
+    if args.verbose:
+        print "Updating Executable to '%s'." % jobscript
+    if not os.path.isfile(jobscript):
+        raise Exception("jobscript '%s' does not exist" % jobscript)
 
-    # Obtain a list of all tenants the user belongs to.  We are going
-    # to use REST API directly as Python libraries don't expose all
-    # functionality we need.
-    token = k_nt.auth_token
-    headers = {'X-Auth-Token': token }
-    tenant_url = auth['auth_url']+'/tenants'
-    r = requests.get(tenant_url, headers=headers)
-    tenant_data = r.json()
+    jobfile_data =  re.sub('^\s*Executable\s*=\s*(.*)$',
+                           'Executable = %s' % jobscript,
+                           jobfile_data,flags=re.MULTILINE)
 
-    # Take first tenant for auth purposes if none specified
-    if not auth['tenant_name']:
-        if len(tenant_data['tenants']) > 0:
-            tenant = tenant_data['tenants'][0]
-            auth['tenant_name'] = tenant['name']
-            if args.verbose:
-                print "No tenant_id specified, so choosing %s" \
-                    % auth['tenant_name']
-        else:
-            raise Exception('Unable to discover tenant_name. Please set')
-
-    # Now get a tenant-scoped keystone client, and obtain the glance_endpoint
+    # determine the name of the image from its UUID, and the name
+    # of the tenant that owns it. First we get a glance client to
+    # get the name of the given image ID. We then query that image's
+    # metadata to obtain its owner tenant id. Finally, we use a second
+    # keystone client scoped to the image's owner tenant to obtain
+    # its tenant name
+    if args.verbose:
+        print "Determine image and tenant names."
     k = ksclient.Client(username=auth['username'],
                         password=auth['password'],
                         tenant_name=auth['tenant_name'],
                         auth_url=auth['auth_url'])
     glance_endpoint = k.service_catalog.url_for(service_type='image')
+    g = glclient.Client(glance_endpoint, token=k.auth_token)
+    i = g.images.get(image_id)
+    image_name = i['name']
+    tenant_id = i['owner']
 
-    # parse image_uri and try to identify/verify its uuid
-    try:
-        # user provided uuid 
-        image_uuid = str(uuid.UUID(image_uri))
-
-        # Loop over all tenants to find that image
-        matches = []
-        
-        for tenant in tenant_data['tenants']:
-            if args.verbose:
-                print "Searching tenant %s: %s" % (tenant['name'],tenant['id'])
-
-            # Get a keystone/glance clients scoped to this tenant              
-            k = ksclient.Client(username=auth['username'],
-                                password=auth['password'],
-                                tenant_name=tenant['name'],
-                                auth_url=auth['auth_url'])
-            glance = glclient.Client(glance_endpoint, token=k.auth_token)
-
-            for i in glance.images.list():
-                if image_uuid == i['id']:
-                    image_name = i['name']
-                    image_tenant_name = tenant['name']
-
-        if not image_tenant_name:
-            raise Exception("Could not locate tenant for image uuid '%s'" \
-                            % image_uuid)
-
-    except ValueError:
-        try:
-            # see if we have tenant_name:image_name
-            (image_tenant_name,image_name) = image_uri.split(':',1)
-        except:
-            raise Exception("image_uri '%s' is badly formed" % image_uri) 
-
-        # Now look for a unique match to supplied image name
-        try:
-            k = ksclient.Client(username=auth['username'],
-                                password=auth['password'],
-                                tenant_name=image_tenant_name,
-                                auth_url=auth['auth_url'])
-            glance = glclient.Client(glance_endpoint, token=k.auth_token)
-        except Exception as E:
-            raise Exception("Couldn't authenticate to tenant '%s': " % image_tenant_name + \
-                            str(E))
-
-        matches = []
-        for glanceimage in glance.images.list():
-            if glanceimage['name'] == image_name:
-                matches.append(glanceimage['id'])
-
-        if len(matches) == 0:
-            raise Exception("Couldn't find image named '%s'" % image_name)
-        elif len(matches) > 1:
-            errstr="Multiple image UUIDs in tenant '%s' match image name '%s':\n%s"\
-                % (image_tenant_name, image_name, '\n'.join(matches))
-            raise Exception(errstr)
-
-        # unique image_uuid
-        image_uuid = matches[0]
-
-        if args.verbose:
-            print "image_uuid: %s" % image_uuid
-
-    # Share the image with batch tenant. First we need to ensure that we
-    # have a glance client scoped to the correct tenant of the image.
-    if args.verbose:
-        print "sharing image uuid '%s' from tenant '%s' with batch tenant" % \
-            (image_uuid,image_tenant_name)
-    k = ksclient.Client(username=auth['username'],
-                        password=auth['password'],
-                        tenant_name=image_tenant_name,
-                        auth_url=auth['auth_url'])
-    glance = glclient.Client(glance_endpoint, token=k.auth_token)
-    try:
-        glance.image_members.create(image_uuid,_BATCH_TENANT_ID)
-    except HTTPConflict as E:
-        if E.code == 409:
-            if args.verbose:
-                print "Image already shared."
-            pass
-        else:
-            raise E
-
-
-    # Check for a valid flavor
-    nova = nclient.Client(auth['username'], auth['password'],
-                          auth['tenant_name'], auth['auth_url'])
-
-    flavors = nova.flavors.list()
-    #good_flavors = []
-    #bad_flavors = []
-    #for f in flavors:
-    #    if f.ephemeral:
-    #        good_flavors.append(f.name)
-    #    else:
-    #        bad_flavors.append(f.name)
-    #if not good_flavors:
-    #    raise Exception("Error: cloud does not offer flavors with ephemeral partition!")
-
-    #if flavor not in good_flavors:
-
-    flavor_names = [f.name for f in flavors]
-    if flavor not in flavor_names:
-        msg = "Supplied flavor '%s' is not valid. Must be one of:\n"\
-              % flavor
-        msg = msg + ', '.join(flavor_names)
-        raise Exception(msg)
+    k_image = ksclient.Client(username=auth['username'],
+                              password=auth['password'],
+                              tenant_id=tenant_id,
+                              auth_url=auth['auth_url'])
+    image_tenant_name = k_image.tenant_name
 
     # generate cloud config file for this user
     try:
@@ -363,14 +275,14 @@ try:
         print "canfarcs pubkey     = %s" % canfarcspubkey
         print "config shell script = %s" % confscript
         print "image_name          = %s" % image_name
+        print "image_tenant_name   = %s" % image_tenant_name
         print "submitter           = %s" % submitter
         print "output YAML         = %s" % conf_yml
 
     vmtype = '%s:%s'%(image_tenant_name,image_name)
 
-    make_cloud_config(confscript,canfarcspubkey,conf_yml,
-                      image_name=vmtype,
-                      submitter=submitter)
+    make_cloud_config(confscript,canfarcspubkey,conf_yml,submitter,
+                      image_name=vmtype)
 
 except Exception as E:
     print "ERROR:",E
@@ -384,8 +296,19 @@ jobfile = '''Requirements = VMType =?= "%s" && Arch == "x86_64"
 +VMInstanceType = "canfar:%s"
 +VMAMIConfig    = "%s"
 +VMKeepAlive    = 5
-''' % (vmtype,image_uuid,flavor,conf_yml) + jobfile_data
+''' % (vmtype,image_id,flavor_id,conf_yml) + jobfile_data
 
-print jobfile
+if args.outfile:
+    try:
+        open(args.outfile,'w').write(jobfile)
+        print "Modified jobfile written to --outfile '%s'" % args.outfile
+    except Exception as E:
+        print "ERROR: Failed to write --outfile '%s'" % args.outfile
+        print E
+        sys.exit(1)
+else:
+    if args.verbose:
+        print "---BEGIN JOBFILE---------------------------------------------------------------"
+    print jobfile
 
 sys.exit(0)
