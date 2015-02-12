@@ -9,7 +9,7 @@ INSTALL_DATA = $(INSTALL) -m 644
 MKDIR_P = mkdir -p
 RM = rm -f
 
-SCRIPTS = canfar_submit canfar_job_validate
+SCRIPTS = canfar_submit canfar_job_validate cansub
 DATA = canfar_batch_setup.bash canfarcs_id_rsa.pub
 
 install: 
