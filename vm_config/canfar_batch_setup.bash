@@ -2,7 +2,7 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.2_rc
+EXEC_VERSION=0.2
 
 EPHEMERAL_DIR="/ephemeral"
 
