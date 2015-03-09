@@ -10,6 +10,9 @@ CM_HOST_NAME="batch.canfar.net"
 # need to specify local ip because no local dns on nefos
 CM_HOST_IP="192.168.0.11"
 
+VMSTORAGE_HOST_NAME="vmstore.canfar.net"
+VMSTORAGE_HOST_IP="192.168.0.14"
+
 UPDATE_CS=false
 SUBMITTER=${USER}
 VM_IMAGE_NAME=${HOSTNAME}
@@ -145,7 +148,7 @@ canfar_setup_etc_hosts() {
     msg "updating ${etc_hosts}"
     # ip are private
     local addstr="# Added for cloud_scheduler to connect to condor CCB"
-    if grep -q ${priv_ip} ${etc_hosts} ; then
+     if grep -q ${priv_ip} ${etc_hosts} ; then
 	sed -i -e "/^[[:space:]]*${priv_ip}/s:\(.*${priv_ip}\).*:\1 ${HOSTNAME} ${addstr}:" ${etc_hosts}
     else
 	echo "${priv_ip} ${HOSTNAME} ${addstr}" >> ${etc_hosts}
@@ -157,6 +160,11 @@ canfar_setup_etc_hosts() {
     else
 	echo "${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}" >> ${etc_hosts}
     fi
+    
+    # glusterfs in local network
+    addstr="# Added for glusterfs to connect locally"
+    sed -i -e "/${VMSTORAGE_HOST_NAME%%.*}/d" ${etc_hosts}
+    echo "${VMSTORAGE_HOST_IP} ${VMSTORAGE_HOST_NAME} ${addstr}" >> ${etc_hosts}
 }
 
 canfar_remove_selinux() {
