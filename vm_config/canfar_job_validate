@@ -217,10 +217,10 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
         if param[0] == '+':
             # Parameters that start with + need to be escaped in regex
             par_regex = '\\'+par_regex
-        regex = "^[^#]*"+par_regex+"\s*=.*$"
-        match = re.findall(regex,jobfile_data,re.MULTILINE)
+        regex = "^\s*"+par_regex+"\s*=.*$"
+        found = re.search(regex,jobfile_data,re.MULTILINE)
 
-        if match:
+        if found:
             msg = "jobfile should not contain parameter '%s'. Reason: %s" \
                   % (param, param_disallow[param])
             raise Exception(msg)
