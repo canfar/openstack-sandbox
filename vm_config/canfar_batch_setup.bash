@@ -89,6 +89,7 @@ canfar_condor_configure() {
     local condorconfig="$(condor_config_val LOCAL_CONFIG_DIR)"
     if [[ -n ${condorconfig} ]]; then
 	mkdir -p ${condorconfig}
+	rm -f ${condorconfig}/*
 	condorconfig="${condorconfig}/cloud_scheduler"
     else
 	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
