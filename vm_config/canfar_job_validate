@@ -14,7 +14,7 @@
 import argparse
 import errno
 import keystoneclient.v2_0.client as ksclient
-from keystoneclient.apiclient import exceptions as keystone_exceptions
+import keystoneclient.exceptions
 import glanceclient.v2.client as glclient
 from glanceclient.exc import HTTPConflict
 import os
@@ -286,7 +286,7 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
 
 except Exception as E:
     print "ERROR:",E
-    if isinstance(E, keystone_exceptions.Unauthorized):
+    if isinstance(E, keystoneclient.exceptions.Unauthorized):
         print "Did you source a valid openrc file? (i.e., are OS_* environment variables set?)\n" + \
             "Check for errors in your credentials."
     sys.exit(1)

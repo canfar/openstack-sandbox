@@ -18,8 +18,8 @@
 
 import argparse
 import keystoneclient.v2_0.client as ksclient
-from keystoneclient.apiclient import exceptions as keystone_exceptions
-import novaclient.v1_1.client as nclient
+import keystoneclient.exceptions
+import novaclient.v2.client as nclient
 import glanceclient.v2.client as glclient
 from glanceclient.exc import HTTPConflict
 import os
@@ -256,7 +256,7 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
 
 except Exception as E:
     print "ERROR:",E
-    if isinstance(E, keystone_exceptions.Unauthorized):
+    if isinstance(E, keystoneclient.exceptions.Unauthorized):
         print \
 '''Are your name, password, and tenant set correctly? (e.g., did you source a
 valid openrc file to set OS_* environment variables ?)'''
