@@ -2,9 +2,9 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.2
+EXEC_VERSION=0.3
 
-EPHEMERAL_DIR="/ephemeral"
+EPHEMERAL_DIR="/mnt"
 
 CM_HOST_NAME="batch.canfar.net"
 # need to specify local ip because no local dns on nefos
@@ -44,8 +44,10 @@ Configure HTCondor for cloud-scheduler on VM execution hosts
 
 # install condor for rpm or deb distros
 canfar_condor_install() {
-    condor_version > /dev/null 2>&1 && msg "condor is already installed" && return 0
-    msg "installing condor"
+    local cv=$(condor_version | awk '/BuildID/ {print $2}')
+    # 8.4.5 has a critical bug that does not work with dynamic slots
+    [[ -n ${cv} ]] && [[ ${cv} != 8.4.5 ]] && msg "condor is already installed" && return 0
+    msg "installing/updating condor"
     # determine os
     if yum --version > /dev/null 2>&1 ; then
 	msg "rpm/yum based distribution detected - now identifiying"
@@ -64,7 +66,7 @@ canfar_condor_install() {
 	fi
        yum -y install condor || die "failed to install condor"
     elif apt-get --version > /dev/null 2>&1 ; then
-	msg "apt/dpkg distribution detected"
+	msg "apt/dpkg distribution detected assume debian wheezy"
 	export DEBIAN_FRONTEND=noninteractive
 	local condordeb="deb http://research.cs.wisc.edu/htcondor/debian/stable/ wheezy contrib"
 	if [[ -d /etc/apt/sources.list.d ]]; then
@@ -84,7 +86,7 @@ canfar_condor_install() {
 
 # configure condor for cloud scheduler
 canfar_condor_configure() {
-    msg "updating condor config"
+    msg "updating condor configuration"
     type -P condor_config_val > /dev/null || die "condor does not seem to be installed"
     local condorconfig="$(condor_config_val LOCAL_CONFIG_DIR)"
     if [[ -n ${condorconfig} ]]; then
@@ -129,15 +131,17 @@ canfar_condor_configure() {
     chown condor:condor ${EPHEMERAL_DIR}
     chown condor:condor ${execdir}
     chmod ugo+rwxt ${execdir}
+    msg "cleaning up condor logs"
     msg "restart condor services to include configuration changes"
+    service condor stop
+    rm -rf $(condor_config_val LOG)/*
     # on CentOS 7 /var/lock/condor is incorrectly owned by root
     if condor_version | grep -q RedHat_7; then
-        service condor stop
         msg "RedHat 7 derivatives need hack for /var/lock/condor ownership."
         mkdir -p /var/lock/condor
         chown condor:condor /var/lock/condor
     fi
-    service condor restart
+    service condor start
 }
 
 canfar_setup_etc_hosts() {
@@ -200,14 +204,14 @@ canfar_fix_resolv_conf() {
 }
 
 canfar_setup_ephemeral() {
-    msg "setting up ephemeral partition"
-    if ! grep -q ${EPHEMERAL_DIR} /etc/mtab; then
-	 if grep /mnt /etc/mtab | grep -q ephemeral; then
-	     sed -i -e "s:/mnt:${EPHEMERAL_DIR}:g" /etc/fstab
-	     umount /mnt
-	 fi
-	 mkdir -p ${EPHEMERAL_DIR}
-	 mount -a
+    msg "workaround some ephemeral are vfat in openstack"
+    if mount | grep -q vdb ; then
+	umount /dev/vdb
+	mkfs.ext3 /dev/vdb
+    else
+	msg "setting up ephemeral storage"
+	mkdir -p ${EPHEMERAL_DIR}
+	mount /dev/vdb ${EPHEMERAL_DIR}
     fi
     chmod 777 ${EPHEMERAL_DIR}
 }
@@ -246,7 +250,7 @@ done
 
 export PATH="/sbin:/usr/sbin:${PATH}"
 
-canfar_fix_resolv_conf
+#canfar_fix_resolv_conf
 canfar_setup_ephemeral
 canfar_remove_selinux
 canfar_condor_install
