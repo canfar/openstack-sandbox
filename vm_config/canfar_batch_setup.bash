@@ -2,9 +2,9 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.3
+EXEC_VERSION=0.3.7
 
-EPHEMERAL_DIR="/mnt"
+EPHEMERAL_DIR="/ephemeral"
 
 CM_HOST_NAME="batch.canfar.net"
 # need to specify local ip because no local dns on nefos
@@ -98,6 +98,11 @@ canfar_condor_configure() {
 	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
     fi
     local execdir=${EPHEMERAL_DIR}/condor
+
+    service condor stop
+    msg "cleaning up condor logs"
+    rm -rf $(condor_config_val LOG)/*
+
     cat > ${condorconfig} <<-EOF
 	#########################################################
 	# Automatically added for cloud_scheduler by ${EXEC_NAME}
@@ -131,16 +136,13 @@ canfar_condor_configure() {
     chown condor:condor ${EPHEMERAL_DIR}
     chown condor:condor ${execdir}
     chmod ugo+rwxt ${execdir}
-    msg "cleaning up condor logs"
-    msg "restart condor services to include configuration changes"
-    service condor stop
-    rm -rf $(condor_config_val LOG)/*
     # on CentOS 7 /var/lock/condor is incorrectly owned by root
     if condor_version | grep -q RedHat_7; then
         msg "RedHat 7 derivatives need hack for /var/lock/condor ownership."
         mkdir -p /var/lock/condor
         chown condor:condor /var/lock/condor
     fi
+    msg "restart condor services to include configuration changes"
     service condor start
 }
 
@@ -204,15 +206,18 @@ canfar_fix_resolv_conf() {
 }
 
 canfar_setup_ephemeral() {
-    msg "workaround some ephemeral are vfat in openstack"
-    if mount | grep -q vdb ; then
-	umount /dev/vdb
-	mkfs.ext3 /dev/vdb
-    else
-	msg "setting up ephemeral storage"
-	mkdir -p ${EPHEMERAL_DIR}
-	mount /dev/vdb ${EPHEMERAL_DIR}
+    msg "setting up ephemeral storage"
+    if mount | grep -q vdb; then
+	if  mount | grep vdb | grep -q vfat; then
+	    msg "workaround some ephemeral are vfat in openstack"
+	    umount /dev/vdb
+	    mkfs.ext3 /dev/vdb
+	else
+	    umount /dev/vdb
+	fi
     fi
+    mkdir -p ${EPHEMERAL_DIR}
+    mount /dev/vdb ${EPHEMERAL_DIR}
     chmod 777 ${EPHEMERAL_DIR}
 }
 
