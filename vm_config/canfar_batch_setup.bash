@@ -2,7 +2,7 @@
 # Shell script to configure Condor for cloud scheduler
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.3.7
+EXEC_VERSION=0.4
 
 EPHEMERAL_DIR="/ephemeral"
 
@@ -205,6 +205,33 @@ canfar_fix_resolv_conf() {
     sed -i -e '1inameserver 8.8.8.8' /etc/resolv.conf
 }
 
+canfar_tweak_tcp() {
+    cat > /etc/sysctl.d/20-canfar-batch.conf <<-EOF
+	kernel.numa_balancing = 0
+	net.core.somaxconn = 1000
+	net.core.netdev_max_backlog = 5000
+	net.core.rmem_max = 16777216
+	net.core.wmem_max = 16777216
+	net.ipv4.neigh.default.gc_thresh1 = 2048
+	net.ipv4.neigh.default.gc_thresh2 = 3072
+	net.ipv4.neigh.default.gc_thresh3 = 4096
+	net.ipv4.tcp_keepalive_time=200
+	net.ipv4.tcp_keepalive_intvl=200
+	net.ipv4.tcp_keepalive_probes=5
+	net.ipv4.tcp_wmem = 4096 12582912 16777216
+	net.ipv4.tcp_rmem = 4096 12582912 16777216
+	net.ipv4.tcp_max_syn_backlog = 8096
+	net.ipv4.tcp_slow_start_after_idle = 0
+	net.ipv4.tcp_tw_reuse = 1
+	vm.dirty_ratio = 80
+	vm.dirty_background_ratio = 5
+	vm.dirty_expire_centisecs = 12000
+	vm.swappiness = 0
+	EOF
+
+    sysctl --system
+}
+
 canfar_setup_ephemeral() {
     msg "setting up ephemeral storage"
     if mount | grep -q vdb; then
@@ -256,6 +283,7 @@ done
 export PATH="/sbin:/usr/sbin:${PATH}"
 
 #canfar_fix_resolv_conf
+canfar_tweak_tcp
 canfar_setup_ephemeral
 canfar_remove_selinux
 canfar_condor_install
