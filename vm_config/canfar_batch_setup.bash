@@ -206,6 +206,8 @@ canfar_fix_resolv_conf() {
 }
 
 canfar_tweak_tcp() {
+    # should exist but we never know
+    mkdir -p  /etc/sysctl.d
     cat > /etc/sysctl.d/20-canfar-batch.conf <<-EOF
 	kernel.numa_balancing = 0
 	net.core.somaxconn = 1000
