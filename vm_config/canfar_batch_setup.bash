@@ -165,13 +165,13 @@ canfar_setup_etc_hosts() {
     if grep -q "${CM_HOST_IP}[[:space:]]*" ${etc_hosts} ; then	
 	sed -i -e "s:[[:space:]]${CM_HOST_IP}[[:space:]]*.*:${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}:" ${etc_hosts}
     else
-	echo "${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}" >> ${etc_hosts}
+	echo "${CM_HOST_IP} batch ${CM_HOST_NAME} ${addstr}" >> ${etc_hosts}
     fi
-    
+
     # glusterfs in local network
     addstr="# Added for glusterfs to connect locally"
     sed -i -e "/${VMSTORAGE_HOST_NAME%%.*}/d" ${etc_hosts}
-    echo "${VMSTORAGE_HOST_IP} ${VMSTORAGE_HOST_NAME} ${addstr}" >> ${etc_hosts}
+    echo "${VMSTORAGE_HOST_IP} vmstore ${VMSTORAGE_HOST_NAME} ${addstr}" >> ${etc_hosts}
 }
 
 canfar_remove_selinux() {
