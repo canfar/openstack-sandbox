@@ -232,6 +232,7 @@ canfar_tweak_tcp() {
 	EOF
 
     sysctl --system
+    sleep 5
 }
 
 canfar_setup_ephemeral() {
