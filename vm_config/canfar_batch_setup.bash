@@ -44,7 +44,7 @@ Configure HTCondor for cloud-scheduler on VM execution hosts
 
 # install condor for rpm or deb distros
 canfar_condor_install() {
-    local cv=$(condor_version | awk '/BuildID/ {print $2}')
+    local cv=$(condor_version 2> /dev/null | awk '/BuildID/ {print $2}')
     # 8.4.5 has a critical bug that does not work with dynamic slots
     [[ -n ${cv} ]] && [[ ${cv} != 8.4.5 ]] && msg "condor is already installed" && return 0
     msg "installing/updating condor"
