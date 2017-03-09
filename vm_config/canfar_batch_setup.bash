@@ -149,7 +149,8 @@ canfar_condor_configure() {
 canfar_setup_etc_hosts() {
     # set up condor ccb only if private networking is available
     local etc_hosts=${1:-/etc/hosts}
-    local priv_ip=$(ip -o -4 addr show eth0 | awk -F '[ /]+' '/global/ {print $4}')
+    local ethname=$(ip -o link show | awk -F': ' '{print $2}' | grep ^e)
+    local priv_ip=$(ip -o -4 addr show ${ethname} | awk -F '[ /]+' '/global/ {print $4}')
     [[ -z ${priv_ip} ]] && die "failed to detect IP address"
     echo ${priv_ip} | egrep -v "127.|192.|172.|10." > /dev/null && return 0
     msg "updating ${etc_hosts}"
@@ -232,7 +233,6 @@ canfar_tweak_tcp() {
 	EOF
 
     sysctl --system
-    sleep 5
 }
 
 canfar_setup_ephemeral() {
