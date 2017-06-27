@@ -8,10 +8,10 @@ EPHEMERAL_DIR="/ephemeral"
 
 CM_HOST_NAME="batch.canfar.net"
 # need to specify local ip because no local dns on nefos
-CM_HOST_IP="192.168.0.11"
+CM_HOST_IP="10.21.0.20"
 
 VMSTORAGE_HOST_NAME="vmstore.canfar.net"
-VMSTORAGE_HOST_IP="192.168.0.14"
+VMSTORAGE_HOST_IP="10.21.0.25"
 
 UPDATE_CS=false
 SUBMITTER=${USER}
@@ -75,10 +75,10 @@ canfar_condor_install() {
 	    echo "${condordeb}" >> /etc/apt/sources.list
 	fi
 	wget -qO - http://research.cs.wisc.edu/htcondor/debian/HTCondor-Release.gpg.key | apt-key add - > /dev/null
-	apt-get -q -y update
+	apt-get -q update -y
 	msg "installing condor..."
 	# htcondor is the name of the package in debian repo, condor is the name in the condor repo
-	apt-get -q -y install condor || die "condor didn't install properly"
+	apt-get -q install -y condor || die "condor didn't install properly"
     else
 	die "unable to detect distribution type"
     fi
