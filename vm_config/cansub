@@ -19,7 +19,7 @@
 import argparse
 import keystoneclient.v2_0.client as ksclient
 import keystoneclient.exceptions
-import novaclient.v2.client as nclient
+import novaclient.client as nclient
 import glanceclient.v2.client as glclient
 from glanceclient.exc import HTTPConflict
 import os
@@ -49,7 +49,7 @@ if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
 
 auth = {'username':'',
         'password':'',
-        'tenant_name' : '',
+        'tenant_id' : '',
         'auth_url':''}
 
 image_id = None
@@ -72,8 +72,8 @@ try:
     parser.add_argument('--os-username',
                         help='user name if OS_USERNAME not set')
     parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
-    parser.add_argument('--os-tenant-name',
-                        help='tenant name for image if OS_TENANT_NAME not set')
+    parser.add_argument('--os-tenant-id',
+                        help='tenant id for image if OS_TENANT_ID not set')
     parser.add_argument('--os-auth-url',help='auth URL if OS_AUTH_URL not set')
     parser.add_argument('-v','--verbose',default=False,
                         help='verbose output',action='store_true')
@@ -129,21 +129,21 @@ try:
 '''auth_url: %s
 username: %s
 password: HIDDEN
-tenant_name: %s
+tenant_id: %s
 jobfile: %s
-jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
+jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_id'],
                     jobfile, jobscript)
 
 
     # Keystone, glance, and nova clients scoped to the given tenant
     k = ksclient.Client(username=auth['username'],
                         password=auth['password'],
-                        tenant_name=auth['tenant_name'],
+                        tenant_id=auth['tenant_id'],
                         auth_url=auth['auth_url'])
     glance_endpoint = k.service_catalog.url_for(service_type='image')
     g = glclient.Client(glance_endpoint, token=k.auth_token)
-    n = nclient.Client(auth['username'], auth['password'],
-                       auth['tenant_name'], auth['auth_url'])
+    n = nclient.Client('2.0',auth['username'], auth['password'],
+                       auth['tenant_id'], auth['auth_url'])
 
     # We will require an image ID. If the user supplied a name, convert
     # it to ID.
@@ -166,7 +166,7 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
             raise Exception("Couldn't find image named '%s'" % image_name)
         elif len(matches) > 1:
             errstr="Multiple image IDs in tenant '%s' match image name '%s':\n%s"\
-                % (auth['tenant_name'], image_name, '\n'.join(matches))
+                % (auth['tenant_id'], image_name, '\n'.join(matches))
             raise Exception(errstr)
         else:
             # unique image_id
