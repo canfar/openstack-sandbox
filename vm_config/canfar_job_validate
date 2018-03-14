@@ -44,6 +44,7 @@ if 'OS_USERNAME' not in os.environ and 'USER' in os.environ:
 auth = {'username':'',
         'password':'',
         'tenant_name' : '',
+        'tenant_id' : '',
         'auth_url':''}
 
 # where to find some common inputs
@@ -147,6 +148,8 @@ try:
     parser.add_argument('--os-password',help='password if OS_PASSWORD not set')
     parser.add_argument('--os-tenant-name',
                         help='tenant name if OS_TENANT_NAME not set')
+    parser.add_argument('--os-tenant-id',
+                        help='tenant id if OS_TENANT_ID not set')
     parser.add_argument('--os-auth-url',help='auth URL if OS_AUTH_URL not set')
     parser.add_argument('--submitter',
                         help='Set submitter for YAML (default $USER)')
@@ -196,11 +199,11 @@ try:
 username: %s
 password: HIDDEN
 tenant_name: %s
+tenant_id: %s
 jobfile: %s
 image_id: %s
-flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
+flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],auth['tenant_id'],
                     jobfile, image_id, flavor_id)
-
 
     # Check parameters in jobfile
     try:
@@ -243,20 +246,22 @@ flavor_id: %s''' % (auth['auth_url'],auth['username'],auth['tenant_name'],
     # keystone client scoped to the image's owner tenant to obtain
     # its tenant name
     if args.verbose:
-        print "Determine image and tenant names."
+        print "Determine image name and tenant id"
     k = ksclient.Client(username=auth['username'],
                         password=auth['password'],
                         tenant_name=auth['tenant_name'],
+                        tenant_id=auth['tenant_id'],
                         auth_url=auth['auth_url'])
     glance_endpoint = k.service_catalog.url_for(service_type='image')
+
     g = glclient.Client(glance_endpoint, token=k.auth_token)
     i = g.images.get(image_id)
     image_name = i['name']
-    tenant_id = i['owner']
 
     k_image = ksclient.Client(username=auth['username'],
                               password=auth['password'],
-                              tenant_id=tenant_id,
+                              tenant_name=auth['tenant_name'],
+                              tenant_id=auth['tenant_id'],
                               auth_url=auth['auth_url'])
     image_tenant_name = k_image.tenant_name
 
