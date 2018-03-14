@@ -14,11 +14,15 @@ die() {
 }
 
 usage() {
-    echo $"Usage: ${EXEC_NAME} [jobfile] [image] [flavor]
-Submit a CANFAR processing job.
-  [jobfile]       Condor job description file
-  [image]         VM image for job (name or ID)
-  [flavor]        hardware flavor (name or ID)
+    echo $"Usage: ${EXEC_NAME} [OPTIONS] JOB_FILE VM_IMAGE VM_FLAVOR
+Submit a CANFAR processing job
+
+  JOB_FILE       HTCondor job submission file
+  VM_IMAGE       OpenStack VM image used to process jobs (name or ID)
+  VM_FLAVOR      OpenStack VM resource flavor used to process jobs
+
+  --help         Output this help
+  --verbose      Set the output more verbose for debugging
 
 Note: Prior to running this script the following OpenStack environment
 variables must be set (e.g., by sourcing your openrc file):
@@ -30,24 +34,43 @@ variables must be set (e.g., by sourcing your openrc file):
     exit
 }
 
+VERBOSE=
+
+while true; do
+    case "$1" in
+	-h | --help) usage ;;
+	-v | --verbose) VERBOSE="--verbose" ;;
+	--)  shift; break ;; # no more options
+	*) break ;; # parameters
+    esac
+    shift
+done
+echo "finished with options"
 
 [[ $# -eq 3 ]] || usage
 
-JOBFILE=$1
-IMAGE=$2
-FLAVOR=$3
+JOB_FILE=$1
+VM_IMAGE=$2
+VM_FLAVOR=$3
 
-[[ -e ${JOBFILE} ]] || die "job file '${JOBFILE}' does not exist"
+[[ -e ${JOB_FILE} ]] || die "HTCondor job submission file '${JOB_FILE}' does not exist"
+if [[ -n ${VERBOSE} ]]; then
+    echo "JOB_FILE:  ${JOB_FILE}"
+    echo "VM_IMAGE:  ${VM_IMAGE}"
+    echo "VM_FLAVOR: ${VM_FLAVOR}"
+fi
 
-# Extract JOBSCRIPT from JOBFILE
-JOBSCRIPT="$(grep '^[^#]*Executable\s*=' ${JOBFILE} | cut -d= -f2 | awk '{print $1}')" || die "could not search for 'Executable' in ${JOBFILE}"
-[[ -z ${JOBSCRIPT} ]] && die "could not extract 'Executable' from ${JOBFILE}"
-[[ -e ${JOBSCRIPT} ]] || die "Executable '${JOBSCRIPT}' from ${JOBFILE} does not exist"
+# Extract executable
+JOB_SCRIPT="$(grep '^[^#]*Executable\s*=' ${JOB_FILE} | cut -d= -f2 | awk '{print $1}')" || die "could not search for 'Executable' in ${JOB_FILE}"
+[[ -z ${JOB_SCRIPT} ]] && die "could not extract 'Executable' from ${JOB_FILE}"
+[[ -e ${JOB_SCRIPT} ]] || die "Executable '${JOB_SCRIPT}' extracted from ${JOB_FILE} does not exist"
 
+[[ -n ${VERBOSE} ]] && echo "JOB_SCRIPT: ${JOB_SCRIPT}"
 # Call cansub with --nopost simply to share the image and translate image
 # and flavor names to their IDs, which is what canfar_job_validate expects.
-IMAGEID_AND_FLAVORID=$(cansub ${JOBFILE} ${IMAGE} ${FLAVOR} --nopost) || die "failed to share image and determine image/flavor IDs"
-
-JOB=$(canfar_job_validate ${JOBFILE} ${JOBSCRIPT} ${IMAGEID_AND_FLAVORID}) || die "failed to validate jobfile: ${JOB}"
+[[ -n ${VERBOSE} ]] && echo "cansub ${JOB_FILE} ${JOB_SCRIPT} ${VM_IMAGE_AND_FLAVOR_IDS}"
+VM_IMAGE_AND_FLAVOR_IDS=$(cansub ${JOB_FILE} ${VM_IMAGE} ${VM_FLAVOR} --nopost) || die "failed to share image and determine image/flavor IDs"
+[[ -n ${VERBOSE} ]] && echo "canfar_job_validate ${VERBOSE} ${JOB_FILE} ${JOB_SCRIPT} ${VM_IMAGE_AND_FLAVOR_IDS}"
+JOB=$(canfar_job_validate ${JOB_FILE} ${JOB_SCRIPT} ${VM_IMAGE_AND_FLAVOR_IDS}) || die "failed to validate job with submission file: ${JOB_FILE}"
 
 echo "${JOB}" | condor_submit || die "failed to submit job to queue"
