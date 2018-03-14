@@ -174,9 +174,15 @@ jobscript: %s''' % (auth['auth_url'],auth['username'],auth['tenant_id'],
 
     # Share the image with batch tenant.
     try:
-        if args.verbose:
-            print "sharing image_id '%s' with batch tenant" % image_id
-        g.image_members.create(image_id,_BATCH_TENANT_ID)
+        im = g.images.get(image_id)
+        if im['visibility'] != 'public':
+            if args.verbose:
+                print "sharing image_id '%s' with batch tenant" % image_id
+                g.image_members.create(image_id,_BATCH_TENANT_ID)
+        else:
+            if args.verbose:
+                print "image_id %s is already public" % image_id
+
     except HTTPConflict as E:
         if E.code == 409:
             if args.verbose:
