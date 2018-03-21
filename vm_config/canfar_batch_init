@@ -61,24 +61,25 @@ canfar_configure_condor_file() {
 
 canfar_configure_condor_worker() {
     local condorconfig=$(canfar_configure_condor_file worker)
-    cat > ${condorconfig} <<-EOF
-	CONDOR_HOST = ${CM_HOST_NAME}
-	ALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
-	CCB_ADDRESS = \$(CONDOR_HOST)
-	DAEMON_LIST = MASTER, STARTD
-	MaxJobRetirementTime = 3600 * 24 * 2
-	SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
-	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
-	SUSPEND = FALSE
-	CONTINUE = TRUE
-	PREEMPT = FALSE
-	KILL = FALSE
-	RUNBENCHMARKS = FALSE
-	UPDATE_COLLECTOR_WITH_TCP = TRUE
-	NUM_SLOTS = 1
-	NUM_SLOTS_TYPE_1 = 1
-	SLOT_TYPE_1_PARTITIONABLE = TRUE
-	EOF
+    cat > ${condorconfig} <<EOF
+CONDOR_HOST = ${CM_HOST_NAME}
+ALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
+CCB_ADDRESS = \$(CONDOR_HOST)
+DAEMON_LIST = MASTER, STARTD
+MaxJobRetirementTime = 3600 * 24 * 2
+SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
+STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
+SUSPEND = FALSE
+CONTINUE = TRUE
+PREEMPT = FALSE
+KILL = FALSE
+RUNBENCHMARKS = FALSE
+UPDATE_COLLECTOR_WITH_TCP = TRUE
+NUM_SLOTS = 1
+NUM_SLOTS_TYPE_1 = 1
+SLOT_TYPE_1_PARTITIONABLE = TRUE
+EOF
+
 }
 
 canfar_configure_condor_cloudscheduler() {
@@ -119,13 +120,13 @@ canfar_configure_condor_user() {
 	done
     else
 	id -u ${VM_USER} 1> /dev//null 2>&1 || die "user ${VM_USER} does not exist on worker VM"
-	cat >> ${condorconfig} <<-EOF
-	    START = ( Owner == ${SUBMITTER} )
-	    STARTER_ALLOW_RUNAS_OWNER = TRUE
-	    UID_DOMAIN = ${CM_HOST_NAME#*.}
-	    TRUST_UID_DOMAIN = TRUE
-	    SOFT_UID_DOMAIN = TRUE
-       EOF
+	cat >> ${condorconfig} <<EOF
+START = ( Owner == ${SUBMITTER} )
+STARTER_ALLOW_RUNAS_OWNER = TRUE
+UID_DOMAIN = ${CM_HOST_NAME#*.}
+TRUST_UID_DOMAIN = TRUE
+SOFT_UID_DOMAIN = TRUE
+EOF
 	
     fi
 }
@@ -184,28 +185,28 @@ canfar_setup_batch_network() {
 
     # tuned tcp stack for VMs
     mkdir -p  /etc/sysctl.d
-    cat > /etc/sysctl.d/20-canfar-batch.conf <<-EOF
-	kernel.numa_balancing = 0
-	net.core.somaxconn = 1000
-	net.core.netdev_max_backlog = 5000
-	net.core.rmem_max = 16777216
-	net.core.wmem_max = 16777216
-	net.ipv4.neigh.default.gc_thresh1 = 2048
-	net.ipv4.neigh.default.gc_thresh2 = 3072
-	net.ipv4.neigh.default.gc_thresh3 = 4096
-	net.ipv4.tcp_keepalive_time=200
-	net.ipv4.tcp_keepalive_intvl=200
-	net.ipv4.tcp_keepalive_probes=5
-	net.ipv4.tcp_wmem = 4096 12582912 16777216
-	net.ipv4.tcp_rmem = 4096 12582912 16777216
-	net.ipv4.tcp_max_syn_backlog = 8096
-	net.ipv4.tcp_slow_start_after_idle = 0
-	net.ipv4.tcp_tw_reuse = 1
-	vm.dirty_ratio = 80
-	vm.dirty_background_ratio = 5
-	vm.dirty_expire_centisecs = 12000
-	vm.swappiness = 0
-	EOF
+    cat > /etc/sysctl.d/20-canfar-batch.conf <<EOF
+kernel.numa_balancing = 0
+net.core.somaxconn = 1000
+net.core.netdev_max_backlog = 5000
+net.core.rmem_max = 16777216
+net.core.wmem_max = 16777216
+net.ipv4.neigh.default.gc_thresh1 = 2048
+net.ipv4.neigh.default.gc_thresh2 = 3072
+net.ipv4.neigh.default.gc_thresh3 = 4096
+net.ipv4.tcp_keepalive_time=200
+net.ipv4.tcp_keepalive_intvl=200
+net.ipv4.tcp_keepalive_probes=5
+net.ipv4.tcp_wmem = 4096 12582912 16777216
+net.ipv4.tcp_rmem = 4096 12582912 16777216
+net.ipv4.tcp_max_syn_backlog = 8096
+net.ipv4.tcp_slow_start_after_idle = 0
+net.ipv4.tcp_tw_reuse = 1
+vm.dirty_ratio = 80
+vm.dirty_background_ratio = 5
+vm.dirty_expire_centisecs = 12000
+vm.swappiness = 0
+EOF
 
     sysctl --system    
 }
