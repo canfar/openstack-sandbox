@@ -24,13 +24,13 @@ Prepare a VM for batch on CANFAR:
 }
 
 canfar_install_condor_rpm() {
-    msg "rpm/yum based distribution detected - now identifiying"
+    msg "rpm/yum based distribution detected"
     local rh_vers=$(rpm -qa \*-release | grep -Ei "redhat|centos|sl" | cut -d "-" -f3)
     if [[ -n ${rh_vers} ]]; then
-	msg "RHEL distribution with version ${rhel_version} detected, adding condor yum repo"
+	msg "distribution version ${rh_vers} detected, adding condor yum repo"
 	rpm --import https://research.cs.wisc.edu/htcondor/yum/RPM-GPG-KEY-HTCondor
 	curl -L https://research.cs.wisc.edu/htcondor/yum/repo.d/htcondor-stable-rhel${rh_vers}.repo \
-	     -O /etc/yum.repos.d/htcondor_stable_rhel${rh_vers}.repo
+	     -o /etc/yum.repos.d/htcondor-stable-rhel${rh_vers}.repo
     else
 	msg "non-RHEL distribution, assuming condor is already available from current repos"
     fi
