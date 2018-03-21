@@ -23,7 +23,7 @@ Prepare a VM for batch on CANFAR:
     exit
 }
 
-canfar_condor_install_rpm() {
+canfar_install_condor_rpm() {
     msg "rpm/yum based distribution detected - now identifiying"
     local rh_vers=$(rpm -qa \*-release | grep -Ei "redhat|centos|sl" | cut -d "-" -f3)
     if [[ -n ${rh_vers} ]]; then
