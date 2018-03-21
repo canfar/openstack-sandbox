@@ -1,0 +1,254 @@
+#!/bin/bash
+
+# Shell script to prepare a CANFAR VM for batch
+# Assumes a debian or fedora based (i.e. ubuntu and centos)
+
+EXEC_NAME=$(basename $0 .${0##*.})
+EXEC_VERSION=0.1.0
+
+# need to specify local ip to bypass unreliable dns on cc clouds.
+CM_HOST_NAME="batch.canfar.net"
+CM_HOST_IP="10.21.0.20"
+VMSTORAGE_HOST_NAME="vmstore.canfar.net"
+VMSTORAGE_HOST_IP="10.21.0.25"
+
+# default image name of the VM
+VM_IMAGE=${HOSTNAME}
+# default user
+VM_USER=anonymous
+# default directory where the ephemeral partition is mounted to run jobs
+VM_EPHEMERAL_DIR="/mnt"
+# default maximum number of jobs per VM (assuming the max vm has VM_MAX_SLOTS CPUs)
+VM_MAX_SLOTS=32
+
+msg() {
+    echo " >> ${EXEC_NAME}: $1"
+}
+
+die() {
+    echo "${EXEC_NAME} Error: $1" 1>&2
+    exit 1
+}
+
+usage() {
+    echo $"Usage: ${EXEC_NAME} [OPTION]
+Configure HTCondor for cloud-scheduler on VM execution hosts
+
+  -a, --anonymous	    the VM is anonymous, no username to run the code
+  -i, --image-name          specify the VM image name (default: ${HOSTNAME})
+  -h, --help                display help and exit
+  -v, --version             output version information and exit
+"
+    exit
+}
+
+# configure condor for cloud scheduler
+canfar_configure_condor_file() {
+    type -P condor_config_val > /dev/null || die "condor does not seem to be installed"
+    local condorconfig="$(condor_config_val LOCAL_CONFIG_DIR)"
+    if [[ -n ${condorconfig} ]]; then
+	mkdir -p ${condorconfig}
+	rm -f ${condorconfig}/$1
+	condorconfig="${condorconfig}/$1"
+    else
+	condorconfig="$(condor_config_val LOCAL_CONFIG_FILE)"
+	[[ -n ${condorconfig} ]] || die "condor configuration file '${condorconfig}' is undefined"
+    fi
+    echo "#########################################################" > ${condorconfig}
+    echo "# Automatically added for CANFAR by ${EXEC_NAME}" >> ${condorconfig}    
+    echo ${condorconfig}
+}
+
+canfar_configure_condor_worker() {
+    local condorconfig=$(canfar_configure_condor_file worker)
+    cat > ${condorconfig} <<-EOF
+	CONDOR_HOST = ${CM_HOST_NAME}
+	ALLOW_WRITE = \$(FULL_HOSTNAME), \$(CONDOR_HOST), \$(IP_ADDRESS)
+	CCB_ADDRESS = \$(CONDOR_HOST)
+	DAEMON_LIST = MASTER, STARTD
+	MaxJobRetirementTime = 3600 * 24 * 2
+	SHUTDOWN_GRACEFUL_TIMEOUT = 3600 * 25 * 2
+	STARTD_ATTRS = COLLECTOR_HOST_STRING VMType
+	SUSPEND = FALSE
+	CONTINUE = TRUE
+	PREEMPT = FALSE
+	KILL = FALSE
+	RUNBENCHMARKS = FALSE
+	UPDATE_COLLECTOR_WITH_TCP = TRUE
+	NUM_SLOTS = 1
+	NUM_SLOTS_TYPE_1 = 1
+	SLOT_TYPE_1_PARTITIONABLE = TRUE
+	EOF
+}
+
+canfar_configure_condor_cloudscheduler() {
+    local condorconfig=$(canfar_configure_condor_file cloudscheduler)
+    echo "VMType = ${VM_IMAGE_NAME}" >> ${condorconfig}
+    echo "${CM_HOST_NAME}" > /etc/condor/central_manager
+}
+
+canfar_configure_condor_execdir() {
+    local execdir="${VM_EPHEMERAL_DIR}/condor"
+    msg "setting up working ephemeral directory for CANFAR"
+    if ! mount | grep -q ${ephemdir}; then 
+	msg "ephemeral partition not mounted. Trying to do so."
+	mkdir -p ${ephemdir}
+	if ! mount /dev/vdb ${ephemdir}; then
+	    msg "VM has no ephemeral partition"
+	    execdir="/var/lib/condor/execute"
+	    msg "condor execdir is now ${execdir}"
+	fi
+    fi
+    [[ -d ${execdir} ]] || mkdir -p ${execdir}
+    chown condor:condor ${EPHEMERAL_DIR}
+    chown condor:condor ${execdir}
+    chmod ugo+rwxt ${execdir}        
+    echo "EXECUTE = ${execdir}" >> ${condorconfig}
+}    
+
+canfar_configure_condor_user() {
+    local condorconfig=$(canfar_configure_condor_file user)
+    if [[ ${VM_USER} == anonymous ]]; then
+	cat >> ${condorconfig} <<-EOF
+	    DEDICATED_EXECUTE_ACCOUNT_REGEXP = slot[0-9]+
+	    STARTER_ALLOW_RUNAS_OWNER = FALSE
+	    EOF
+	local i
+	# create home directory because vos needs certs in there
+	for i in $(seq -w ${VM_MAX_SLOTS}); do
+	    echo "SLOT1_USER${i} = slot${i}" >> ${condorconfig}
+	    useradd --shell /bin/bash --gid condor --create-home slot${i}
+	done
+    else
+	id -u ${VM_USER} ]] 1> /dev//null 2>&1 || die "user ${VM_USER} does not exist on worker VM"
+	cat >> ${condorconfig} <<-EOF
+	    START = ( Owner == ${SUBMITTER} )
+	    STARTER_ALLOW_RUNAS_OWNER = TRUE
+	    UID_DOMAIN = ${CM_HOST_NAME#*.}
+	    TRUST_UID_DOMAIN = TRUE
+	    SOFT_UID_DOMAIN = TRUE
+	    EOF
+    fi
+}
+
+canfar_setup_batch_condor() {
+    msg "restart condor services to include CANFAR configuration changes"
+    service condor stop
+    canfar_configure_cloudscheduler
+    canfar_configure_condor_user
+    # cleaning up condor logs at each new VM worker
+    rm -rf $(condor_config_val LOG)/*
+    service condor start
+}
+
+canfar_setup_batch_network() {
+
+    # detect if using a LAN
+    local etc_hosts="/etc/hosts"
+    local ethname=$(ip -o link show | awk -F': ' '{print $2}' | grep ^e)
+    local priv_ip=$(ip -o -4 addr show ${ethname} | awk -F '[ /]+' '/global/ {print $4}')
+    [[ -z ${priv_ip} ]] && die "failed to detect IP address"
+    echo ${priv_ip} | egrep -v "127.|192.|172.|10." > /dev/null && return 0
+
+    # CANFAR assumes IPs are local to the cluster
+    # Set up condor ccb only if private networking is available
+    msg "updating ${etc_hosts}"
+
+    local addstr="# Added for cloud_scheduler to connect to condor CCB"
+     if grep -q ${priv_ip} ${etc_hosts} ; then
+	sed -i -e "/^[[:space:]]*${priv_ip}/s:\(.*${priv_ip}\).*:\1 ${HOSTNAME} ${addstr}:" ${etc_hosts}
+    else
+	echo "${priv_ip} ${HOSTNAME} ${addstr}" >> ${etc_hosts}
+    fi
+    addstr="# Added for condor to specify central manager of local network"
+    sed -i -e "/${CM_HOST_NAME}/d" ${etc_hosts}
+    if grep -q "${CM_HOST_IP}[[:space:]]*" ${etc_hosts} ; then	
+	sed -i -e "s:[[:space:]]${CM_HOST_IP}[[:space:]]*.*:${CM_HOST_IP} ${CM_HOST_NAME} ${addstr}:" ${etc_hosts}
+    else
+	echo "${CM_HOST_IP} batch ${CM_HOST_NAME} ${addstr}" >> ${etc_hosts}
+    fi
+
+    # Read-only glusterfs local master
+    addstr="# Added for glusterfs to connect locally"
+    sed -i -e "/${VMSTORAGE_HOST_NAME%%.*}/d" ${etc_hosts}
+    echo "${VMSTORAGE_HOST_IP} vmstore ${VMSTORAGE_HOST_NAME} ${addstr}" >> ${etc_hosts}
+
+    # Disable firewall (usually only needed on centos6)
+    if service iptables status 2> /dev/null; then
+	msg "disabling IPV4 firewall for CANFAR"
+	service iptables stop
+    fi
+    if service ip6tables status 2> /dev/null; then
+	msg "disabling IPV6 firewall for CANFAR"
+	service ip6tables stop
+    fi
+
+    # tuned tcp stack for VMs
+    mkdir -p  /etc/sysctl.d
+    cat > /etc/sysctl.d/20-canfar-batch.conf <<-EOF
+	kernel.numa_balancing = 0
+	net.core.somaxconn = 1000
+	net.core.netdev_max_backlog = 5000
+	net.core.rmem_max = 16777216
+	net.core.wmem_max = 16777216
+	net.ipv4.neigh.default.gc_thresh1 = 2048
+	net.ipv4.neigh.default.gc_thresh2 = 3072
+	net.ipv4.neigh.default.gc_thresh3 = 4096
+	net.ipv4.tcp_keepalive_time=200
+	net.ipv4.tcp_keepalive_intvl=200
+	net.ipv4.tcp_keepalive_probes=5
+	net.ipv4.tcp_wmem = 4096 12582912 16777216
+	net.ipv4.tcp_rmem = 4096 12582912 16777216
+	net.ipv4.tcp_max_syn_backlog = 8096
+	net.ipv4.tcp_slow_start_after_idle = 0
+	net.ipv4.tcp_tw_reuse = 1
+	vm.dirty_ratio = 80
+	vm.dirty_background_ratio = 5
+	vm.dirty_expire_centisecs = 12000
+	vm.swappiness = 0
+	EOF
+
+    sysctl --system    
+}
+
+canfar_setup_batch_selinux() {
+    # selinux not friendly with condor in our configuration
+    # enabled on RHEL images by default
+    if getenforce > /dev/null 2>&1 && [[ $(getenforce) != Disabled ]]; then
+	msg "disabling selinux"
+	[[ -e /etc/selinux/config ]] && \
+	    sed -i -e 's/^SELINUX=.*/SELINUX=disabled/g' /etc/selinux/config
+	setenforce 0
+    fi
+}
+
+
+# Store all options
+OPTS=$(getopt \
+    -o i:u:hv \
+    -l image-name: \
+    -l user: \
+    -l help \
+    -l version \
+    -- "$@")
+
+eval set -- "${OPTS}"
+
+# Process options
+while true; do
+    case "$1" in
+	-i | --image-name) VM_IMAGE=${2##=}; shift ;;
+	-u | --username)   VM_USER=${2##=}; shift ;;
+	-h | --help) usage ;;
+	-V | --version) echo ${EXEC_VERSION}; exit ;;
+	--)  shift; break ;; # no more options
+	*) break ;; # parameters
+    esac
+    shift
+done
+
+export PATH="/sbin:/usr/sbin:${PATH}"
+
+canfar_setup_batch_condor
+canfar_setup_batch_network
+canfar_setup_batch_selinux
