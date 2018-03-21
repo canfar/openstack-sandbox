@@ -26,7 +26,7 @@ msg() {
 }
 
 die() {
-    echo "${EXEC_NAME} Error: $1" 1>&2
+    echo "ERROR ${EXEC_NAME}: $1" 1>&2
     exit 1
 }
 
@@ -34,8 +34,8 @@ usage() {
     echo $"Usage: ${EXEC_NAME} [OPTION]
 Configure HTCondor for cloud-scheduler on VM execution hosts
 
-  -a, --anonymous	    the VM is anonymous, no username to run the code
   -i, --image-name          specify the VM image name (default: ${HOSTNAME})
+  -u, --user		    specify the user to run jobs with (default: will create ${VM_MAX_SLOTS} anonymous users)
   -h, --help                display help and exit
   -v, --version             output version information and exit
 "
@@ -118,14 +118,15 @@ canfar_configure_condor_user() {
 	    useradd --shell /bin/bash --gid condor --create-home slot${i}
 	done
     else
-	id -u ${VM_USER} ]] 1> /dev//null 2>&1 || die "user ${VM_USER} does not exist on worker VM"
+	id -u ${VM_USER} 1> /dev//null 2>&1 || die "user ${VM_USER} does not exist on worker VM"
 	cat >> ${condorconfig} <<-EOF
 	    START = ( Owner == ${SUBMITTER} )
 	    STARTER_ALLOW_RUNAS_OWNER = TRUE
 	    UID_DOMAIN = ${CM_HOST_NAME#*.}
 	    TRUST_UID_DOMAIN = TRUE
 	    SOFT_UID_DOMAIN = TRUE
-	    EOF
+       EOF
+	
     fi
 }
 
