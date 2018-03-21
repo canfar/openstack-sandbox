@@ -27,14 +27,20 @@ canfar_install_condor_rpm() {
     msg "rpm/yum based distribution detected - now identifiying"
     local rh_vers=$(rpm -qa \*-release | grep -Ei "redhat|centos|sl" | cut -d "-" -f3)
     if [[ -n ${rh_vers} ]]; then
-	msg "RHEL distribution detected, adding extra repo to install condor"
+	msg "RHEL distribution with version ${rhel_version} detected, adding condor yum repo"
 	rpm --import https://research.cs.wisc.edu/htcondor/yum/RPM-GPG-KEY-HTCondor
 	curl -L https://research.cs.wisc.edu/htcondor/yum/repo.d/htcondor-stable-rhel${rh_vers}.repo \
 	     -O /etc/yum.repos.d/htcondor_stable_rhel${rh_vers}.repo
     else
-	msg "non-RHEL distribution, assuming condor is already in repos"
+	msg "non-RHEL distribution, assuming condor is already available from current repos"
     fi
     yum -y install condor || die "failed to install condor"
+    # on CentOS 7 /var/lock/condor is incorrectly owned by root
+    if condor_version | grep -q RedHat_7; then
+        msg "RedHat 7 derivatives need hack for /var/lock/condor ownership."
+        mkdir -p /var/lock/condor
+        chown condor:condor /var/lock/condor
+    fi
 }
 
 canfar_install_condor_deb() {
@@ -67,13 +73,7 @@ canfar_install_condor() {
     elif apt-get --version > /dev/null 2>&1 ; then
 	canfar_install_condor_deb
     else
-	die "unable to detect distribution type"
-    fi
-    # on CentOS 7 /var/lock/condor is incorrectly owned by root
-    if condor_version | grep -q RedHat_7; then
-        msg "RedHat 7 derivatives need hack for /var/lock/condor ownership."
-        mkdir -p /var/lock/condor
-        chown condor:condor /var/lock/condor
+	die "unable to detect distribution type, you must install it yourself"
     fi
 }
 
