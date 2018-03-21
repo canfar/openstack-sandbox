@@ -3,7 +3,7 @@
 # Shell script to prepare a VM for batch at interactive time
 
 EXEC_NAME=$(basename $0 .${0##*.})
-EXEC_VERSION=0.1.0
+EXEC_VERSION=0.1.1
 
 msg() {
     echo " >> ${EXEC_NAME}: $1"
@@ -18,7 +18,7 @@ usage() {
     echo $"Usage: ${EXEC_NAME}
 Prepare a VM for batch on CANFAR:
 1. Setup a workspace on an ephemeral partition to work on while interactive (/mnt/work)
-2. Install condor
+2. Install condor if VM is either RPM or DEB based.
 "
     exit
 }
@@ -28,17 +28,13 @@ canfar_condor_install_rpm() {
     local rh_vers=$(rpm -qa \*-release | grep -Ei "redhat|centos|sl" | cut -d "-" -f3)
     if [[ -n ${rh_vers} ]]; then
 	msg "RHEL distribution detected, adding extra repo to install condor"
-	cat <<-EOF > /etc/yum.repos.d/htcondor_stable_rhel${rh_vers}.repo
-	    [htcondor_stable_rhel${rh_vers}]
-	    gpgcheck = 0	
-	    enabled = 1
-	    baseurl = http://research.cs.wisc.edu/htcondor/yum/stable/rhel${rh_vers}
-	    name = HTCondor Stable RPM Repository for Redhat Enterprise Linux ${rh_vers}
-	    EOF
-	else
-	    msg "non-RHEL distribution, assuming condor is already in repos"
-	fi
-       yum -y install condor || die "failed to install condor"    
+	rpm --import https://research.cs.wisc.edu/htcondor/yum/RPM-GPG-KEY-HTCondor
+	curl -L https://research.cs.wisc.edu/htcondor/yum/repo.d/htcondor-stable-rhel${rh_vers}.repo \
+	     -O /etc/yum.repos.d/htcondor_stable_rhel${rh_vers}.repo
+    else
+	msg "non-RHEL distribution, assuming condor is already in repos"
+    fi
+    yum -y install condor || die "failed to install condor"
 }
 
 canfar_install_condor_deb() {
