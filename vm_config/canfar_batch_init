@@ -109,10 +109,8 @@ canfar_configure_condor_execdir() {
 canfar_configure_condor_user() {
     local condorconfig=$(canfar_configure_condor_file user)
     if [[ ${VM_USER} == anonymous ]]; then
-	cat >> ${condorconfig} <<-EOF
-	    DEDICATED_EXECUTE_ACCOUNT_REGEXP = slot[0-9]+
-	    STARTER_ALLOW_RUNAS_OWNER = FALSE
-	    EOF
+	echo "DEDICATED_EXECUTE_ACCOUNT_REGEXP = slot[0-9]+" >> ${condorconfig}
+	echo "STARTER_ALLOW_RUNAS_OWNER = FALSE" >> ${condorconfig}
 	local i
 	# create home directory because vos needs certs in there
 	for i in $(seq -w ${VM_MAX_SLOTS}); do
@@ -134,7 +132,7 @@ canfar_configure_condor_user() {
 canfar_setup_batch_condor() {
     msg "restart condor services to include CANFAR configuration changes"
     service condor stop
-    canfar_configure_cloudscheduler
+    canfar_configure_condor_cloudscheduler
     canfar_configure_condor_user
     # cleaning up condor logs at each new VM worker
     rm -rf $(condor_config_val LOG)/*
@@ -238,7 +236,7 @@ eval set -- "${OPTS}"
 while true; do
     case "$1" in
 	-i | --image-name) VM_IMAGE=${2##=}; shift ;;
-	-u | --username)   VM_USER=${2##=}; shift ;;
+	-u | --user)   VM_USER=${2##=}; shift ;;
 	-h | --help) usage ;;
 	-V | --version) echo ${EXEC_VERSION}; exit ;;
 	--)  shift; break ;; # no more options
