@@ -29,7 +29,7 @@ canfar_install_condor_rpm() {
     if [[ -n ${rh_vers} ]]; then
 	msg "distribution version ${rh_vers} detected, adding condor yum repo"
 	rpm --import https://research.cs.wisc.edu/htcondor/yum/RPM-GPG-KEY-HTCondor
-	curl -L https://research.cs.wisc.edu/htcondor/yum/repo.d/htcondor-stable-rhel${rh_vers}.repo \
+	curl -sL https://research.cs.wisc.edu/htcondor/yum/repo.d/htcondor-stable-rhel${rh_vers}.repo \
 	     -o /etc/yum.repos.d/htcondor-stable-rhel${rh_vers}.repo
     else
 	msg "non-RHEL distribution, assuming condor is already available from current repos"
