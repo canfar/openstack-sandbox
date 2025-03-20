@@ -1,4 +1,12 @@
-# CANFAR Migration to OpenStack
+# THIS REPOSITORY IS NOW OBSOLETE
+
+Any further work on CANFAR has now switched to https://github.com/opencadc
+
+
+
+
+
+### CANFAR Migration to OpenStack
 
 Repository containing exploratory work for migrating CANFAR services from Nimbus to OpenStack clouds.
 
